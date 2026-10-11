@@ -91,6 +91,49 @@ func TestReport(t *testing.T) {
 	}
 }
 
+// Neither CD key may reach a report, however it was written into a log, in
+// a report written whole or cut down to fit.
+func TestReportHasNoCDKeys(t *testing.T) {
+	const classic = "BCDE2467FGHJ89KM"
+	const expansion = "PRTVWX246789BCDEFGHJKMNPRT"
+
+	data := t.TempDir()
+	write(t, filepath.Join(data, "logs", "launcher.log"),
+		`level=INFO msg="legacy-dl" line="install D2XP 1.13c --cdkey `+classic+` --cdkey-expansion `+expansion+`"`+"\n"+
+			`level=INFO msg=typed key=bcde-2467-fghj-89km`+"\n"+
+			`level=INFO msg=typed key="PRTVWX-2467-89BCDE-FGHJ-KMNPRT"`+"\n")
+	write(t, filepath.Join(data, "state.json"), `{"note": "`+expansion+`"}`)
+
+	items := Collect(Input{DataDir: data, About: "key " + classic})
+
+	var whole bytes.Buffer
+	if err := Write(&whole, items, ""); err != nil {
+		t.Fatal(err)
+	}
+	fitted, _, err := Fit(items, "", 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, zipped := range map[string][]byte{"Write": whole.Bytes(), "Fit": fitted} {
+		z, err := zip.NewReader(bytes.NewReader(zipped), int64(len(zipped)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range z.File {
+			r, _ := f.Open()
+			body, _ := io.ReadAll(r)
+			r.Close()
+			flat := strings.ToUpper(strings.NewReplacer("-", "", " ", "").Replace(string(body)))
+			for _, key := range []string{classic, expansion} {
+				if strings.Contains(flat, key) {
+					t.Errorf("%s: %s holds a CD key: %s", name, f.Name, body)
+				}
+			}
+		}
+	}
+}
+
 func TestReadCappedKeepsTheEnd(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "big.log")
 	write(t, path, strings.Repeat("a", maxFile)+"newest")

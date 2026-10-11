@@ -131,6 +131,10 @@ tasks:
     dir: build/windows/nsis
     deps:
       - task: build
+      - task: common:fetch:legacy-dl
+        vars:
+          TARGET_OS: windows
+          TARGET_ARCH: '{{.ARCH}}'
     preconditions:
       - sh: '[ "{{.INSTALL_SCOPE}}" = "user" ] || [ "{{.INSTALL_SCOPE}}" = "machine" ]'
         msg: "INSTALL_SCOPE must be 'user' or 'machine', got '{{.INSTALL_SCOPE}}'"
@@ -139,9 +143,9 @@ tasks:
       - wails3 generate webview2bootstrapper -dir "{{.ROOT_DIR}}/build/windows/nsis"
       - |
         {{if eq OS "windows"}}
-        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}{{.NSIS_VERSION}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" project.nsi
+        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}{{.NSIS_VERSION}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" -DARG_LEGACY_DL="{{.ROOT_DIR}}\{{.BIN_DIR}}\legacy-dl\windows-{{.ARCH}}\blizzard-legacy-dl.exe" -DARG_LEGACY_DL_LICENSE="{{.ROOT_DIR}}\{{.BIN_DIR}}\legacy-dl\LICENSE.txt" project.nsi
         {{else}}
-        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}{{.NSIS_VERSION}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" project.nsi
+        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}{{.NSIS_VERSION}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" -DARG_LEGACY_DL="{{.ROOT_DIR}}/{{.BIN_DIR}}/legacy-dl/windows-{{.ARCH}}/blizzard-legacy-dl.exe" -DARG_LEGACY_DL_LICENSE="{{.ROOT_DIR}}/{{.BIN_DIR}}/legacy-dl/LICENSE.txt" project.nsi
         {{end}}
     vars:
       ARCH: '{{.ARCH | default ARCH}}'

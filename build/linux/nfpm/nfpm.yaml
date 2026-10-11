@@ -19,6 +19,14 @@ release: "1"
 contents:
   - src: "./bin/launcher"
     dst: "/usr/local/bin/launcher"
+  # Installs the base game from Blizzard's CDN; the launcher looks for it
+  # beside itself. Packages are built for amd64.
+  - src: "./bin/legacy-dl/linux-amd64/blizzard-legacy-dl"
+    dst: "/usr/local/bin/blizzard-legacy-dl"
+    file_info:
+      mode: 0755
+  - src: "./bin/legacy-dl/LICENSE.txt"
+    dst: "/usr/share/doc/launcher/blizzard-legacy-dl-LICENSE.txt"
   - src: "./build/appicon.png"
     dst: "/usr/share/icons/hicolor/128x128/apps/launcher.png"
   - src: "./build/linux/launcher.desktop"
