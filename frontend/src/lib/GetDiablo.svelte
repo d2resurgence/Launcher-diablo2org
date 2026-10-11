@@ -1,0 +1,398 @@
+<script lang="ts">
+  import { Events, type CancellablePromise } from "@wailsio/runtime";
+  import { ServerService, type BaseInstallResult } from "../../bindings/github.com/diablo2org/launcher/internal/app";
+  import type { Progress } from "../../bindings/github.com/diablo2org/launcher/internal/basegame";
+  import type { BaseSetup, ServerInfo } from "../../bindings/github.com/diablo2org/launcher/internal/core";
+  import { onMount } from "svelte";
+  import Icon from "./Icon.svelte";
+  import { bytes, errorText } from "./format";
+  import { app } from "./state.svelte";
+
+  // The "Get Diablo II" steps of the welcome screen: install the game, or
+  // use the one already installed; then, for an install, the CD keys and
+  // the install itself.
+  let { picked, onBack, onFinish }: { picked: ServerInfo[]; onBack: () => void; onFinish: () => Promise<void> } = $props();
+
+  let setup = $state<BaseSetup | null>(null);
+  let step = $state<"choose" | "keys" | "progress">("choose");
+  let choice = $state<"install" | "existing">("install");
+  let dir = $state("");
+  let version = $state("");
+  let advanced = $state(false);
+  let classicKey = $state("");
+  let expansionKey = $state("");
+  let owner = $state("");
+  let finishing = $state(false);
+
+  // The install, while it runs and once it's done.
+  let running: CancellablePromise<BaseInstallResult> | null = null;
+  let cancelled = false;
+  let installing = $state(false);
+  let progress = $state<Progress | null>(null);
+  let result = $state<BaseInstallResult | null>(null);
+  let failure = $state("");
+  let serverState = $state<"pending" | "active" | "done" | "failed">("pending");
+  let cacheCleared = $state(false);
+
+  const o = $derived(app.overview);
+  const first = $derived(picked[0]);
+  const firstData = $derived(first ? app.server(first.id) : null);
+
+  // Pre-1.14 and 1.14 clients differ in their archives, so a server only
+  // runs on a base of its own family.
+  const family = (v: string) => (v.startsWith("1.14") ? "1.14" : "pre-1.14");
+  const mismatched = $derived(picked.filter((s) => s.profile && family(s.profile.game.version) !== family(version)));
+
+  const keysReady = $derived(norm(classicKey) !== "" && norm(expansionKey) !== "");
+  const total = $derived(choice === "install" ? 4 : 2);
+  const stepNumber = $derived(step === "choose" ? 2 : step === "keys" ? 3 : 4);
+
+  onMount(() => {
+    ServerService.BaseSetup().then((s) => {
+      setup = s;
+      dir = s.defaultDir;
+      owner = s.owner;
+      // 1.13c unless every server picked is a 1.14 one.
+      const versions = picked.map((p) => p.profile?.game.version ?? "");
+      version = versions.length && versions.every((v) => family(v) === "1.14") && s.versions.includes("1.14d") ? "1.14d" : s.defaultVersion;
+      // A game the launcher found, or one it can't install: use what's there.
+      if (app.baseReady || !s.available) choice = "existing";
+    });
+  });
+
+  $effect(() => {
+    return Events.On("base:progress", (ev: { data: Progress }) => {
+      progress = ev.data;
+    });
+  });
+
+  // Trimmed, upper-cased, without spaces or hyphens: what the launcher
+  // stores. No other checks: nobody can check a key any more.
+  function norm(key: string): string {
+    return key.replace(/[\s-]/g, "").toUpperCase();
+  }
+
+  async function chooseFolder() {
+    try {
+      const picked = await ServerService.ChooseInstallFolder();
+      if (picked) dir = picked;
+    } catch (err) {
+      failure = errorText(err);
+    }
+  }
+
+  async function install() {
+    step = "progress";
+    installing = true;
+    failure = "";
+    result = null;
+    progress = null;
+    serverState = "pending";
+    cancelled = false;
+
+    try {
+      running = ServerService.InstallBase({ version, dir, classicKey: norm(classicKey), expansionKey: norm(expansionKey), owner: owner.trim() });
+      result = await running;
+    } catch (err) {
+      // Cancelling rejects the call too.
+      result = { ok: false, cancelled, error: cancelled ? "" : errorText(err), warnings: [], cacheBytes: 0 };
+    } finally {
+      running = null;
+      installing = false;
+    }
+
+    if (result.cancelled) {
+      step = "keys";
+      return;
+    }
+    if (!result.ok) {
+      failure = result.error;
+      return;
+    }
+
+    // The new folder is the Diablo II folder now.
+    app.overview = await ServerService.Overview();
+    if (firstData) {
+      serverState = "active";
+      await firstData.update();
+      serverState = firstData.error || firstData.copyBytes > 0 ? "failed" : "done";
+    }
+  }
+
+  function cancel() {
+    cancelled = true;
+    running?.cancel();
+  }
+
+  async function clearCache() {
+    try {
+      await ServerService.ClearBaseCache();
+      cacheCleared = true;
+    } catch (err) {
+      failure = errorText(err);
+    }
+  }
+
+  async function finish() {
+    finishing = true;
+    await onFinish();
+    finishing = false;
+  }
+
+  // Each row of the progress list: done, under way, waiting, or failed.
+  type Row = { label: string; state: "pending" | "active" | "done" | "failed"; detail: string };
+  const product = (code: string) => (code === "D2XP" ? "Lord of Destruction" : "Diablo II");
+  const rows = $derived.by((): Row[] => {
+    const p = progress;
+    const ok = result?.ok === true;
+    const failed = !installing && !!failure;
+    const downloaded = ok || (p !== null && p.product === "D2XP" && p.stage !== "download");
+
+    let downloadDetail = "From Blizzard";
+    if (p?.stage === "download") {
+      downloadDetail = p.total > 0 ? `${product(p.product)}: ${Math.floor((p.done / p.total) * 100)}%` : `${product(p.product)}: starting`;
+    }
+    let installDetail = "";
+    if (p?.stage === "install") installDetail = `Installing ${product(p.product)}`;
+    if (p?.stage === "patch") installDetail = `Patching to ${version}`;
+
+    const list: Row[] = [
+      { label: "Download", state: downloaded ? "done" : failed ? "failed" : "active", detail: downloaded ? "" : downloadDetail },
+      {
+        label: "Install",
+        state: ok ? "done" : failed && downloaded ? "failed" : p && p.stage !== "download" ? "active" : "pending",
+        detail: ok ? "" : installDetail,
+      },
+    ];
+    if (first) {
+      let detail = "";
+      if (serverState === "active" && firstData?.progress?.total) detail = `${bytes(firstData.progress.done)} of ${bytes(firstData.progress.total)}`;
+      if (serverState === "failed") detail = firstData?.copyBytes ? "Finish installing it from its page" : firstData?.error ?? "";
+      list.push({ label: first.profile?.name ?? first.id, state: serverState, detail });
+    }
+    return list;
+  });
+
+  const allDone = $derived(result?.ok === true && (!first || serverState === "done" || serverState === "failed"));
+</script>
+
+<p class="text-[11px] text-muted">Step {stepNumber} of {total}</p>
+
+{#if step === "choose"}
+  <h1 class="title mt-2 text-[26px]">Get Diablo II</h1>
+  <p class="mt-3 max-w-2xl text-[13px] leading-relaxed text-body">
+    Servers run on top of Diablo II and Lord of Destruction. Each server gets its own folder inside your game, so the game itself
+    is never changed.
+  </p>
+
+  <div class="mt-6 grid grid-cols-2 gap-3">
+    <button
+      class={[
+        "rounded border p-5 text-left transition-colors disabled:opacity-40",
+        choice === "install" ? "border-accent bg-accent/20" : "border-line bg-panel/90 hover:border-edge",
+      ]}
+      aria-pressed={choice === "install"}
+      disabled={!setup?.available}
+      title={setup && !setup.available ? setup.unavailable : undefined}
+      onclick={() => (choice = "install")}
+    >
+      <p class="title text-[14px]">Install Diablo II for me</p>
+      <p class="mt-2 text-[12px] leading-snug text-body">Downloads Diablo II and Lord of Destruction from Blizzard (about 2 GB).</p>
+    </button>
+    <button
+      class={[
+        "rounded border p-5 text-left transition-colors",
+        choice === "existing" ? "border-accent bg-accent/20" : "border-line bg-panel/90 hover:border-edge",
+      ]}
+      aria-pressed={choice === "existing"}
+      onclick={() => (choice = "existing")}
+    >
+      <p class="title text-[14px]">I already have Diablo II installed</p>
+      <p class="mt-2 text-[12px] leading-snug text-body">Use the folder where Diablo II and Lord of Destruction are installed.</p>
+    </button>
+  </div>
+
+  {#if choice === "install"}
+    <section class="mt-4 rounded border border-line bg-panel/90 p-5">
+      <h2 class="title text-[14px]">Install into</h2>
+      <p class="mt-2 truncate text-[13px] text-title" title={dir}>{dir}</p>
+      <button
+        class="title mt-4 flex items-center gap-2 rounded-[3px] border border-edge px-4 py-2 text-[12px] hover:border-muted"
+        onclick={chooseFolder}
+      >
+        <Icon name="folder" size={14} />
+        Choose another folder
+      </button>
+
+      <button class="title mt-5 text-[12px] !text-muted hover:!text-title" aria-expanded={advanced} onclick={() => (advanced = !advanced)}>
+        {advanced ? "Hide advanced" : "Advanced"}
+      </button>
+      {#if advanced && setup}
+        <div class="mt-3 flex items-center gap-3">
+          <label class="text-[12px] text-body" for="base-version">Game version</label>
+          <select id="base-version" class="h-8 rounded-[3px] border border-edge bg-panel px-2 text-[12px]" bind:value={version}>
+            {#each setup.versions as v (v)}
+              <option value={v}>{v}{v === setup.defaultVersion ? " (recommended)" : ""}</option>
+            {/each}
+          </select>
+        </div>
+        {#if mismatched.length}
+          <p class="mt-2 text-[12px] text-bad">
+            {mismatched.map((s) => s.profile?.name ?? s.id).join(", ")}
+            {mismatched.length === 1 ? "runs" : "run"} on Diablo II {mismatched[0].profile?.game.version}, which won't work with a {version} install.
+          </p>
+        {/if}
+      {/if}
+    </section>
+  {:else}
+    <section class="mt-4 rounded border border-line bg-panel/90 p-5">
+      <h2 class="title text-[14px]">Your Diablo II folder</h2>
+      {#if !o?.base}
+        <p class="mt-2 text-[13px] text-body">Diablo II wasn't found. Choose the folder where Diablo II and Lord of Destruction are installed.</p>
+      {:else}
+        <p class="mt-2 truncate text-[13px] text-title" title={o.base}>{o.base}</p>
+        {#if o.baseError}
+          <p class="mt-2 text-[12px] text-bad">{o.baseError}</p>
+        {:else if o.report?.missing?.length}
+          <p class="mt-2 text-[12px] text-bad">
+            Missing {o.report.missing.join(", ")}. Install Diablo II and Lord of Destruction there, or choose another folder.
+          </p>
+        {:else}
+          <p class="mt-2 flex items-center gap-1.5 text-[12px] text-date"><Icon name="check" size={13} /> Diablo II and Lord of Destruction found.</p>
+        {/if}
+      {/if}
+      {#if o?.warning}
+        <p class="mt-2 text-[12px] text-date">{o.warning}</p>
+      {/if}
+      <button
+        class="title mt-4 flex items-center gap-2 rounded-[3px] border border-edge px-4 py-2 text-[12px] hover:border-muted"
+        onclick={() => app.chooseBase()}
+      >
+        <Icon name="folder" size={14} />
+        {o?.base ? "Choose another folder" : "Choose folder"}
+      </button>
+    </section>
+  {/if}
+
+  {#if failure}
+    <p class="mt-4 text-[12px] text-bad">{failure}</p>
+  {/if}
+
+  <div class="mt-8 flex items-center gap-4">
+    {#if choice === "install"}
+      <button
+        class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50"
+        disabled={!setup?.available || !dir}
+        onclick={() => (step = "keys")}
+      >
+        Next
+      </button>
+    {:else}
+      <button
+        class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50"
+        disabled={!app.baseReady || finishing}
+        onclick={finish}
+      >
+        Done
+      </button>
+      {#if !app.baseReady}
+        <button class="title text-[12px] !text-muted hover:!text-title" onclick={finish}>Skip for now</button>
+      {/if}
+    {/if}
+    <button class="title text-[12px] !text-muted hover:!text-title" onclick={onBack}>Back</button>
+  </div>
+{:else if step === "keys"}
+  <h1 class="title mt-2 text-[26px]">Your CD keys</h1>
+  <p class="mt-3 max-w-2xl text-[13px] leading-relaxed text-body">
+    Enter the CD keys from your own copies of Diablo II and Lord of Destruction. You'll find them in your Blizzard account under
+    Games &amp; Subscriptions. The launcher doesn't check them — nobody can any more — but playing needs a copy you own. Keys are
+    stored only inside your game files on this computer.
+  </p>
+
+  <section class="mt-6 grid max-w-xl gap-4 rounded border border-line bg-panel/90 p-5">
+    <label class="grid gap-1.5">
+      <span class="text-[12px] text-body">Diablo II CD key</span>
+      <input type="text" class="h-9 rounded-[3px] border border-edge bg-panel px-2 font-mono text-[13px] uppercase" autocomplete="off" spellcheck="false" bind:value={classicKey} />
+    </label>
+    <label class="grid gap-1.5">
+      <span class="text-[12px] text-body">Lord of Destruction CD key</span>
+      <input type="text" class="h-9 rounded-[3px] border border-edge bg-panel px-2 font-mono text-[13px] uppercase" autocomplete="off" spellcheck="false" bind:value={expansionKey} />
+    </label>
+    <label class="grid gap-1.5">
+      <span class="text-[12px] text-body">Owner name</span>
+      <input type="text" class="h-9 rounded-[3px] border border-edge bg-panel px-2 text-[13px]" autocomplete="off" spellcheck="false" bind:value={owner} />
+    </label>
+  </section>
+
+  <div class="mt-8 flex items-center gap-4">
+    <button
+      class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50"
+      disabled={!keysReady}
+      onclick={install}
+    >
+      Install
+    </button>
+    <button class="title text-[12px] !text-muted hover:!text-title" onclick={() => (step = "choose")}>Back</button>
+  </div>
+{:else}
+  <h1 class="title mt-2 text-[26px]">{allDone ? "Ready to play" : "Installing Diablo II"}</h1>
+  <p class="mt-3 max-w-2xl text-[13px] leading-relaxed text-body">
+    {#if allDone}
+      Diablo II is installed in <span class="text-title">{dir}</span>.
+    {:else}
+      This can take a while. If it stops, installing again carries on where it left off.
+    {/if}
+  </p>
+
+  <ol class="mt-6 grid max-w-xl gap-2">
+    {#each rows as row (row.label)}
+      <li class="flex items-center gap-3 rounded border border-line bg-panel/90 px-4 py-3">
+        <span
+          class={[
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]",
+            row.state === "done" && "border-accent bg-accent",
+            row.state === "active" && "animate-pulse border-accent",
+            row.state === "failed" && "border-bad text-bad",
+            row.state === "pending" && "border-edge",
+          ]}
+          aria-label={row.state}
+        >
+          {#if row.state === "done"}<Icon name="check" size={12} />{:else if row.state === "failed"}!{/if}
+        </span>
+        <span class="title text-[13px]">{row.label}</span>
+        {#if row.detail}
+          <span class="ml-auto truncate text-[12px] text-muted" title={row.detail}>{row.detail}</span>
+        {/if}
+      </li>
+    {/each}
+  </ol>
+
+  {#if failure}
+    <p class="mt-4 max-w-xl whitespace-pre-line text-[12px] text-bad">{failure}</p>
+  {/if}
+  {#if result?.warnings?.length}
+    <ul class="mt-4 max-w-xl text-[12px] text-date">
+      {#each result.warnings as w (w)}
+        <li>Note: {w}. A Diablo II key is 16 or 26 letters and digits.</li>
+      {/each}
+    </ul>
+  {/if}
+
+  <div class="mt-8 flex items-center gap-4">
+    {#if installing}
+      <button class="title rounded-[3px] border border-edge px-6 py-2 text-[13px] hover:border-muted" onclick={cancel}>Cancel</button>
+    {:else if failure}
+      <button class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125" onclick={install}>Try again</button>
+      <button class="title text-[12px] !text-muted hover:!text-title" onclick={() => (step = "choose")}>Back</button>
+    {:else if allDone}
+      <button class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50" disabled={finishing} onclick={finish}>
+        Play
+      </button>
+      {#if result && result.cacheBytes > 0 && !cacheCleared}
+        <button class="title text-[12px] !text-muted hover:!text-title" onclick={clearCache}>
+          Free up {bytes(result.cacheBytes)} (delete the download)
+        </button>
+      {/if}
+    {/if}
+  </div>
+{/if}

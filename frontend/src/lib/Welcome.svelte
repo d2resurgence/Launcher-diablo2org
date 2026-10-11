@@ -1,14 +1,14 @@
 <script lang="ts">
+  import GetDiablo from "./GetDiablo.svelte";
   import Icon from "./Icon.svelte";
   import { app } from "./state.svelte";
 
-  // Two steps: the Diablo II folder, then the servers to pin.
-  let step = $state<"folder" | "servers">("folder");
+  // The servers to pin come first, so the next step can show what they
+  // need; then getting Diablo II, by installing it or finding it.
+  let step = $state<"servers" | "game">("servers");
   let picked = $state<string[]>([]);
-  let busy = $state(false);
 
   const o = $derived(app.overview);
-  const missing = $derived(o?.report?.missing ?? []);
   const listed = $derived(app.servers.filter((s) => s.profile && s.verified));
   const full = $derived(picked.length >= 3);
 
@@ -17,11 +17,7 @@
     else if (!full) picked = [...picked, id];
   }
 
-  async function finish() {
-    busy = true;
-    await app.finishWelcome(picked);
-    busy = false;
-  }
+  const pickedInfo = $derived(picked.map((id) => listed.find((s) => s.id === id)).filter((s) => s !== undefined));
 
   // Logos for the listed servers, fetched once.
   $effect(() => {
@@ -36,61 +32,17 @@
 
 <div class="h-full overflow-y-auto px-10 pt-8 pb-10">
   <div class="mx-auto max-w-3xl">
-    <p class="text-[11px] text-muted">Step {step === "folder" ? 1 : 2} of 2</p>
-
-    {#if step === "folder"}
+    {#if step === "game"}
+      <GetDiablo picked={pickedInfo} onBack={() => (step = "servers")} onFinish={() => app.finishWelcome(picked)} />
+    {:else}
+      <p class="text-[11px] text-muted">Step 1</p>
       <h1 class="title mt-2 text-[26px]">Welcome</h1>
       <p class="mt-3 max-w-2xl text-[13px] leading-relaxed text-body">
         This launcher installs, updates and starts Diablo II private servers. Each server gets its own folder inside your Diablo II
         install, so your game is never changed and servers don't get in each other's way.
       </p>
 
-      <section class="mt-8 rounded border border-line bg-panel/90 p-5">
-        <h2 class="title text-[14px]">Your Diablo II folder</h2>
-
-        {#if !o?.base}
-          <p class="mt-2 text-[13px] text-body">
-            Diablo II wasn't found. Choose the folder where Diablo II and Lord of Destruction are installed.
-          </p>
-        {:else}
-          <p class="mt-2 truncate text-[13px] text-title" title={o.base}>{o.base}</p>
-          {#if o.baseError}
-            <p class="mt-2 text-[12px] text-bad">{o.baseError}</p>
-          {:else if missing.length}
-            <p class="mt-2 text-[12px] text-bad">
-              Missing {missing.join(", ")}. Install Diablo II and Lord of Destruction there, or choose another folder.
-            </p>
-          {:else}
-            <p class="mt-2 flex items-center gap-1.5 text-[12px] text-date"><Icon name="check" size={13} /> Diablo II and Lord of Destruction found.</p>
-          {/if}
-        {/if}
-        {#if o?.warning}
-          <p class="mt-2 text-[12px] text-date">{o.warning}</p>
-        {/if}
-
-        <button
-          class="title mt-4 flex items-center gap-2 rounded-[3px] border border-edge px-4 py-2 text-[12px] hover:border-muted"
-          onclick={() => app.chooseBase()}
-        >
-          <Icon name="folder" size={14} />
-          {o?.base ? "Choose another folder" : "Choose folder"}
-        </button>
-      </section>
-
-      <div class="mt-8 flex items-center gap-4">
-        <button
-          class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50"
-          disabled={!app.baseReady}
-          onclick={() => (step = "servers")}
-        >
-          Next
-        </button>
-        {#if !app.baseReady}
-          <button class="title text-[12px] !text-muted hover:!text-title" onclick={() => (step = "servers")}>Skip for now</button>
-        {/if}
-      </div>
-    {:else}
-      <h1 class="title mt-2 text-[26px]">Pick your servers</h1>
+      <h2 class="title mt-8 text-[18px]">Pick your servers</h2>
       <p class="mt-3 max-w-2xl text-[13px] leading-relaxed text-body">
         Choose up to three to keep in the bar on the left, and switch between them with Ctrl+1, 2 and 3. You can change them any time
         from All servers.
@@ -142,10 +94,9 @@
       </ul>
 
       <div class="mt-8 flex items-center gap-4">
-        <button class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50" disabled={busy} onclick={finish}>
-          {picked.length ? "Done" : "Skip for now"}
+        <button class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125" onclick={() => (step = "game")}>
+          {picked.length ? "Next" : "Skip for now"}
         </button>
-        <button class="title text-[12px] !text-muted hover:!text-title" onclick={() => (step = "folder")}>Back</button>
       </div>
     {/if}
   </div>
