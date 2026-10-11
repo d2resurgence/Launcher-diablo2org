@@ -103,8 +103,16 @@ func TestReportHasNoCDKeys(t *testing.T) {
 			`level=INFO msg=typed key=bcde-2467-fghj-89km`+"\n"+
 			`level=INFO msg=typed key="PRTVWX-2467-89BCDE-FGHJ-KMNPRT"`+"\n")
 	write(t, filepath.Join(data, "state.json"), `{"note": "`+expansion+`"}`)
+	write(t, filepath.Join(data, "logs", "wine.log"), "wine: key "+classic+"\n")
 
 	items := Collect(Input{DataDir: data, About: "key " + classic})
+	var hasWine bool
+	for _, it := range items {
+		hasWine = hasWine || it.Name == "logs/wine.log"
+	}
+	if !hasWine {
+		t.Error("the Wine log isn't in the report")
+	}
 
 	var whole bytes.Buffer
 	if err := Write(&whole, items, ""); err != nil {

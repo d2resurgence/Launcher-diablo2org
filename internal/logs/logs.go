@@ -24,6 +24,8 @@ const (
 	Current = "launcher.log"
 	// Crash collects the trace of any crash.
 	Crash = "crash.log"
+	// Wine collects the output of Wine, on macOS and Linux.
+	Wine = "wine.log"
 )
 
 const (
@@ -67,6 +69,16 @@ func Setup(dataDir, version string) (func() error, error) {
 	slog.Info("launcher started", "version", version, "os", runtime.GOOS, "arch", runtime.GOARCH, "go", runtime.Version())
 
 	return w.Close, nil
+}
+
+// OpenWine opens the Wine log in a data folder, rotated like the
+// launcher's own.
+func OpenWine(dataDir string) (*Writer, error) {
+	dir := Dir(dataDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	return Open(filepath.Join(dir, Wine), maxSize, keep)
 }
 
 // Writer is a log file that starts a new file when it grows past a size,
