@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/diablo2org/launcher/internal/mpq"
 )
 
 // Archive is one of Blizzard's base archives. Servers never ship these; their
@@ -94,8 +96,13 @@ var ErrCrossVolume = errors.New("hard links need the server folder on the same d
 
 // LinkArchives makes the base archives visible inside a server folder as
 // hard links: no extra disk space and no admin rights, but only on the same
-// NTFS volume. Archives already linked are left alone.
-func LinkArchives(base, serverDir string, expansion bool) error {
+// volume. Archives already linked are left alone.
+//
+// pre114 is set for a server whose game is older than 1.14. A 1.14 base's
+// d2sfx.mpq has a 1.14-format (attributes) that the older Storm.dll can't
+// read, so that archive gets a corrected copy instead of a link: see
+// placeFixed.
+func LinkArchives(base, serverDir string, expansion, pre114 bool) error {
 	if err := os.MkdirAll(serverDir, 0o755); err != nil {
 		return err
 	}
@@ -113,6 +120,13 @@ func LinkArchives(base, serverDir string, expansion bool) error {
 		}
 
 		dst := filepath.Join(serverDir, a.Name)
+		if pre114 && needsFix(src) {
+			if err := placeFixed(src, srcInfo, dst); err != nil {
+				return fmt.Errorf("%s: %w", a.Name, err)
+			}
+			continue
+		}
+
 		if dstInfo, err := os.Stat(dst); err == nil {
 			if os.SameFile(srcInfo, dstInfo) {
 				continue
@@ -137,7 +151,8 @@ func LinkArchives(base, serverDir string, expansion bool) error {
 
 // CopyArchives is the fallback when LinkArchives can't link. It uses real
 // disk space, so the launcher asks the player first, showing CopySize.
-func CopyArchives(base, serverDir string, expansion bool) error {
+// pre114 is as for LinkArchives.
+func CopyArchives(base, serverDir string, expansion, pre114 bool) error {
 	if err := os.MkdirAll(serverDir, 0o755); err != nil {
 		return err
 	}
@@ -154,7 +169,13 @@ func CopyArchives(base, serverDir string, expansion bool) error {
 		}
 
 		dst := filepath.Join(serverDir, a.Name)
-		if dstInfo, err := os.Stat(dst); err == nil && dstInfo.Size() == srcInfo.Size() {
+		if pre114 && needsFix(src) {
+			if err := placeFixed(src, srcInfo, dst); err != nil {
+				return fmt.Errorf("%s: %w", a.Name, err)
+			}
+			continue
+		}
+		if dstInfo, err := os.Stat(dst); err == nil && dstInfo.Size() == srcInfo.Size() && !needsFix(dst) {
 			continue
 		}
 
@@ -164,6 +185,32 @@ func CopyArchives(base, serverDir string, expansion bool) error {
 	}
 
 	return nil
+}
+
+// needsFix reports whether an archive has a 1.14-format (attributes), which
+// a pre-1.14 game can't read. It's decided from the archive's contents, not
+// its name or the base's version: only the 1.14 d2sfx.mpq has one.
+func needsFix(path string) bool {
+	modern, err := mpq.IsModern(path)
+	return err == nil && modern
+}
+
+// placeFixed puts a copy of src, a 1.14 archive, at dst with its
+// (attributes) unlisted, unless one is already there. The base archive is
+// never changed, and nothing is downloaded: the copy is the player's own
+// archive with one hash-table entry marked deleted.
+func placeFixed(src string, srcInfo os.FileInfo, dst string) error {
+	if dstInfo, err := os.Stat(dst); err == nil {
+		if !os.SameFile(srcInfo, dstInfo) && dstInfo.Size() == srcInfo.Size() && !needsFix(dst) {
+			return nil
+		}
+		// A link to the base archive, or a stale copy: replace it. Removing
+		// a link leaves the base archive as it was.
+		if err := os.Remove(dst); err != nil {
+			return err
+		}
+	}
+	return mpq.CopyWithoutAttributes(src, dst)
 }
 
 // CopySize is how much disk space CopyArchives would use.
