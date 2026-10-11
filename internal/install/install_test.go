@@ -229,3 +229,22 @@ func TestCopyArchivesPre114Server(t *testing.T) {
 		t.Errorf("d2data.mpq = %q", data)
 	}
 }
+
+func TestCopyArchives114ServerKeepsCopy(t *testing.T) {
+	b := base114(t)
+	server := filepath.Join(t.TempDir(), "srv")
+	if err := CopyArchives(b, server, true, false); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := os.Stat(filepath.Join(server, "d2sfx.mpq"))
+
+	// A 1.14 server's plain copy of the 1.14 archive is right as it is: not
+	// copied again on the next update.
+	if err := CopyArchives(b, server, true, false); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := os.Stat(filepath.Join(server, "d2sfx.mpq"))
+	if !again.ModTime().Equal(first.ModTime()) || !needsFix(filepath.Join(server, "d2sfx.mpq")) {
+		t.Error("the 1.14 copy was rewritten or changed")
+	}
+}

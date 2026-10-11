@@ -268,4 +268,11 @@ func TestOpenRejects(t *testing.T) {
 	if _, err := Open(bytes.NewReader(bad)); err == nil {
 		t.Error("opened an archive with a bad hash table size")
 	}
+
+	// A sector shift that overflows the sector size to 0.
+	huge := build(t, 3, member{name: "a", data: []byte("x")})
+	binary.LittleEndian.PutUint16(huge[14:], 23)
+	if _, err := Open(bytes.NewReader(huge)); err == nil {
+		t.Error("opened an archive whose sector size overflows")
+	}
 }

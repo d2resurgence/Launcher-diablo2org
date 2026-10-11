@@ -142,7 +142,8 @@ func Open(r io.ReaderAt) (*Archive, error) {
 	blockPos := int64(binary.LittleEndian.Uint32(h[20:]))
 	hashLen := binary.LittleEndian.Uint32(h[24:])
 	blockLen := binary.LittleEndian.Uint32(h[28:])
-	if blockSize > 23 || hashLen > maxTable || blockLen > maxTable || hashLen&(hashLen-1) != 0 {
+	// 512 << 23 overflows the sector size to 0.
+	if blockSize > 22 || hashLen > maxTable || blockLen > maxTable || hashLen&(hashLen-1) != 0 {
 		return nil, errors.New("bad MPQ header")
 	}
 

@@ -175,7 +175,7 @@ func CopyArchives(base, serverDir string, expansion, pre114 bool) error {
 			}
 			continue
 		}
-		if dstInfo, err := os.Stat(dst); err == nil && dstInfo.Size() == srcInfo.Size() && !needsFix(dst) {
+		if dstInfo, err := os.Stat(dst); err == nil && dstInfo.Size() == srcInfo.Size() {
 			continue
 		}
 
