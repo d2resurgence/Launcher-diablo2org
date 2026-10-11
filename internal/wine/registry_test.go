@@ -130,3 +130,30 @@ func TestStartArgs(t *testing.T) {
 		}
 	}
 }
+
+func TestSetGame(t *testing.T) {
+	r := &Registry{}
+	r.SetGame("Game.exe", "1.13c")
+	data := encodeReg(map[string][]namedValue{appDefaultsKey + "Game.exe": {r.pending[appDefaultsKey+"Game.exe"]["version"]}})
+	text, _ := decodeUTF16(data)
+	if !strings.Contains(text, "[HKEY_CURRENT_USER\\Software\\Wine\\AppDefaults\\Game.exe]") {
+		t.Errorf("key missing:\n%s", text)
+	}
+	got, _ := parseExport(data, appDefaultsKey+"Game.exe")
+	if got["version"].sz != "winxp" {
+		t.Errorf("1.13c: Version = %q", got["version"].sz)
+	}
+
+	r.SetGame("Game.exe", "1.14d")
+	data = encodeReg(map[string][]namedValue{appDefaultsKey + "Game.exe": {r.pending[appDefaultsKey+"Game.exe"]["version"]}})
+	text, _ = decodeUTF16(data)
+	if !strings.Contains(text, "\"Version\"=-\r\n") {
+		t.Errorf("1.14d: the value isn't removed:\n%s", text)
+	}
+
+	for _, bad := range []string{"", `..\x.exe`, "a/b.exe", "x]"} {
+		if err := r.SetGame(bad, "1.13c"); err == nil {
+			t.Errorf("accepted exe %q", bad)
+		}
+	}
+}

@@ -129,6 +129,13 @@ type Registry interface {
 	SetString(name, value string) error
 }
 
+// GameRegistry is a Registry told which game a launch is for, by its exe's
+// file name and game.version: under Wine, an older game needs Wine to
+// report an older Windows to it.
+type GameRegistry interface {
+	SetGame(exe, version string) error
+}
+
 // Committer is a Registry that holds its writes until Commit, such as one
 // writing into a Wine prefix, where every write costs a process. Launch
 // commits once the settings are all written, before starting any box.
@@ -209,6 +216,11 @@ func (l *Launcher) Launch(ctx context.Context, base, serverDir string, p *spec.P
 
 	if err := l.configure(base, serverDir, p); err != nil {
 		return fmt.Errorf("setting up Battle.net: %w", err)
+	}
+	if g, ok := l.registry.(GameRegistry); ok {
+		if err := g.SetGame(filepath.Base(boxes[0].Exe), p.Game.Version); err != nil {
+			return fmt.Errorf("setting up the game: %w", err)
+		}
 	}
 	if c, ok := l.registry.(Committer); ok {
 		if err := c.Commit(); err != nil {

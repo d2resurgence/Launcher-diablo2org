@@ -23,6 +23,9 @@ const (
 	diabloKey    = `HKEY_CURRENT_USER\Software\Blizzard Entertainment\Diablo II`
 )
 
+// appDefaultsKey holds Wine's settings for one program, by exe file name.
+const appDefaultsKey = `HKEY_CURRENT_USER\Software\Wine\AppDefaults\`
+
 // regTimeout bounds each regedit call.
 var regTimeout = time.Minute
 
@@ -47,11 +50,13 @@ type Registry struct {
 	pending map[string]map[string]namedValue
 }
 
-// regValue is a REG_SZ (multi nil) or REG_MULTI_SZ value.
+// regValue is a REG_SZ (multi nil) or REG_MULTI_SZ value, or with del, the
+// value's removal.
 type regValue struct {
 	sz    string
 	multi []string
 	isMul bool
+	del   bool
 }
 
 // GatewayList reads the gateway list; none yet is an empty list.
@@ -81,6 +86,22 @@ func (r *Registry) String(name string) (string, error) {
 // SetString writes a value under the game's own key at the next Commit.
 func (r *Registry) SetString(name, value string) error {
 	r.set(diabloKey, name, regValue{sz: value})
+	return nil
+}
+
+// SetGame has Wine report Windows XP to a game older than 1.14, at the next
+// Commit. Under Wine on Apple Silicon, 1.13c's Fog.dll overflows its stack
+// at start-up when told Windows 10, Wine's default; told XP, it starts. A
+// 1.14 game gets Wine's default back.
+func (r *Registry) SetGame(exe, version string) error {
+	if exe == "" || strings.ContainsAny(exe, `\/[]`) {
+		return fmt.Errorf("unexpected game exe %q", exe)
+	}
+	v := regValue{del: true}
+	if !strings.HasPrefix(version, "1.14") {
+		v = regValue{sz: "winxp"}
+	}
+	r.set(appDefaultsKey+exe, "Version", v)
 	return nil
 }
 
@@ -237,6 +258,10 @@ func encodeReg(keys map[string][]namedValue) []byte {
 		values := keys[key]
 		sort.Slice(values, func(i, j int) bool { return values[i].name < values[j].name })
 		for _, v := range values {
+			if v.value.del {
+				b.WriteString(quote(v.name) + "=-\r\n")
+				continue
+			}
 			kind, data := "hex(1)", utf16z(v.value.sz)
 			if v.value.isMul {
 				kind = "hex(7)"

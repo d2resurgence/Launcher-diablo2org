@@ -259,9 +259,15 @@ func TestLaunchNotInstalled(t *testing.T) {
 type committingRegistry struct {
 	fakeRegistry
 	commits int
+	game    string
 }
 
 func (c *committingRegistry) Commit() error { c.commits++; return nil }
+
+func (c *committingRegistry) SetGame(exe, version string) error {
+	c.game = exe + " " + version
+	return nil
+}
 
 // winePaths stands in for wine.WinPath and wine.UnixPath, which this
 // package can't import.
@@ -300,6 +306,9 @@ func TestLaunchMappedPaths(t *testing.T) {
 	}
 	if reg.commits != 1 {
 		t.Errorf("committed %d times, want once per launch", reg.commits)
+	}
+	if reg.game != "Game.exe 1.13c" {
+		t.Errorf("SetGame got %q", reg.game)
 	}
 	// The box itself still runs from host paths.
 	if started[0].Exe != filepath.Join(server, "Game.exe") || started[0].Dir != server {
