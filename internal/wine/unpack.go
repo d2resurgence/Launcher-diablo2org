@@ -118,10 +118,24 @@ func entryPath(name string) (string, error) {
 }
 
 // linkInside checks a symbolic link at name, pointing to target, stays
-// inside the archive.
+// inside the archive. A .. is only allowed before any other part, as in
+// ../lib/x: after one, as in y/.., where it's taken depends on whether y is
+// itself a link, which cleaning the path as text can't see.
 func linkInside(name, target string) error {
 	if target == "" || strings.HasPrefix(target, "/") || strings.Contains(target, `\`) {
 		return fmt.Errorf("%s: unsafe link to %q", name, target)
+	}
+	leading := true
+	for _, part := range strings.Split(target, "/") {
+		switch part {
+		case "..":
+			if !leading {
+				return fmt.Errorf("%s: link to %q has .. after a folder", name, target)
+			}
+		case "", ".":
+		default:
+			leading = false
+		}
 	}
 	resolved := path.Clean(path.Join(path.Dir(name), target))
 	if resolved == ".." || strings.HasPrefix(resolved, "../") {

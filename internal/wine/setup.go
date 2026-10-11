@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"strings"
 )
 
 // Step is a part of setting Wine up, as the setup screen lists them.
@@ -54,18 +56,28 @@ func (s Setup) Run(ctx context.Context, progress func(Progress)) (*Prefix, error
 
 	report(Progress{Step: StepWine})
 	if s.UseSystem {
-		if rt, err := SystemWine(ctx); err == nil {
-			p, err := s.ready(ctx, rt, report)
+		rt, err := SystemWine(ctx)
+		switch {
+		case err == nil && s.rejected(rt.Version):
+			// Known not to run 32-bit programs; not tried again.
+		case err == nil:
+			p, err := s.ready(ctx, rt, s.SystemPrefixDir(), report)
 			if err == nil {
 				return p, nil
 			}
 			slog.Info("not using the system's Wine", "version", rt.Version, "err", err)
-		} else if !errors.Is(err, ErrNoRuntime) {
+			if errors.Is(err, ErrNo32Bit) {
+				s.reject(rt.Version)
+			}
+		case !errors.Is(err, ErrNoRuntime):
 			slog.Info("not using the system's Wine", "err", err)
 		}
 	}
 
 	if s.Manager.Pin.URL == "" {
+		if hint := InstallHint(); hint != "" {
+			return nil, fmt.Errorf("%w. Install Wine: %s", ErrNoRuntime, hint)
+		}
 		return nil, ErrNoRuntime
 	}
 	total := s.Manager.Pin.Size
@@ -82,14 +94,40 @@ func (s Setup) Run(ctx context.Context, progress func(Progress)) (*Prefix, error
 		return nil, err
 	}
 
-	return s.ready(ctx, rt, report)
+	return s.ready(ctx, rt, s.PrefixDir, report)
 }
 
-// ready makes the prefix ready for rt. The 32-bit check runs when the
-// prefix was made or updated: it takes seconds, and is the same answer
+// SystemPrefixDir is the prefix used with the system's Wine. It's kept
+// apart from the one the launcher's own Wine uses, so an older system Wine
+// never opens a prefix a newer Wine made (Wine can't take one back a
+// version), and switching between them doesn't update one prefix back and
+// forth.
+func (s Setup) SystemPrefixDir() string {
+	return s.PrefixDir + "-system"
+}
+
+// rejectedFile records a system Wine version that can't run 32-bit
+// programs, so later runs go straight to the launcher's own.
+func (s Setup) rejectedFile() string {
+	return s.PrefixDir + "-system-rejected"
+}
+
+func (s Setup) rejected(version string) bool {
+	data, err := os.ReadFile(s.rejectedFile())
+	return err == nil && strings.TrimSpace(string(data)) == version
+}
+
+func (s Setup) reject(version string) {
+	if err := os.WriteFile(s.rejectedFile(), []byte(version+"\n"), 0o644); err != nil {
+		slog.Warn("remember the system's Wine", "err", err)
+	}
+}
+
+// ready makes the prefix in dir ready for rt. The 32-bit check runs when
+// the prefix was made or updated: it takes seconds, and is the same answer
 // until the runtime changes.
-func (s Setup) ready(ctx context.Context, rt *Runtime, report func(Progress)) (*Prefix, error) {
-	p := &Prefix{Dir: s.PrefixDir, Runtime: rt, Debug: s.Debug, Log: s.Log}
+func (s Setup) ready(ctx context.Context, rt *Runtime, dir string, report func(Progress)) (*Prefix, error) {
+	p := &Prefix{Dir: dir, Runtime: rt, Debug: s.Debug, Log: s.Log}
 	report(Progress{Step: StepPrefix})
 
 	changed, err := p.Ensure(ctx)

@@ -2,6 +2,7 @@ package wine
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -100,11 +101,30 @@ exit 0
 `), 0o755)
 
 	s := Setup{PrefixDir: filepath.Join(t.TempDir(), "prefix")}
-	if _, err := s.ready(context.Background(), rt, func(Progress) {}); err == nil {
-		t.Fatal("a wine without 32-bit support was accepted")
+	_, err := s.ready(context.Background(), rt, s.PrefixDir, func(Progress) {})
+	if !errors.Is(err, ErrNo32Bit) {
+		t.Fatalf("a wine without 32-bit support: %v", err)
 	}
 	// The next try checks again rather than trusting the prefix.
-	if _, err := s.ready(context.Background(), rt, func(Progress) {}); err == nil {
+	if _, err := s.ready(context.Background(), rt, s.PrefixDir, func(Progress) {}); err == nil {
 		t.Fatal("accepted on the second try")
+	}
+}
+
+func TestSystemWineRejection(t *testing.T) {
+	s := Setup{PrefixDir: filepath.Join(t.TempDir(), "prefix")}
+	if s.SystemPrefixDir() == s.PrefixDir {
+		t.Fatal("system Wine shares the launcher's prefix")
+	}
+	if s.rejected("system wine-9.0") {
+		t.Fatal("rejected before any try")
+	}
+	s.reject("system wine-9.0")
+	if !s.rejected("system wine-9.0") {
+		t.Error("rejection not remembered")
+	}
+	// A different version, such as after the player updates Wine, is tried.
+	if s.rejected("system wine-10.0") {
+		t.Error("another version rejected")
 	}
 }

@@ -40,12 +40,19 @@ func (p *Prefix) Env(overrides ...string) []string {
 	return Env(os.Environ(), p.Dir, p.Debug, overrides...)
 }
 
+// waitDelay is how long Wait keeps reading a finished Wine call's output.
+// wine may start the wineserver, which inherits the output pipe and, when
+// persistent, outlives the call: without a limit, Wait would wait for the
+// server to exit.
+const waitDelay = 2 * time.Second
+
 // Command is wine with args in this prefix, logging its output.
 func (p *Prefix) Command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, p.Runtime.Wine, args...)
 	cmd.Env = p.Env()
 	cmd.Stdout = p.log()
 	cmd.Stderr = p.log()
+	cmd.WaitDelay = waitDelay
 	return cmd
 }
 
@@ -65,11 +72,21 @@ func (p *Prefix) output(ctx context.Context, timeout time.Duration, args ...stri
 	cmd := p.Command(ctx, args...)
 	cmd.Stdout = io.MultiWriter(&buf, p.log())
 	cmd.Stderr = cmd.Stdout
-	err := cmd.Run()
+	err := run(cmd)
 	if ctx.Err() == context.DeadlineExceeded {
 		return buf.String(), fmt.Errorf("wine %s took longer than %s", strings.Join(args, " "), timeout)
 	}
 	return buf.String(), err
+}
+
+// run runs cmd. A call that succeeded but left a wineserver holding its
+// output open, so that WaitDelay cut the reading short, succeeded.
+func run(cmd *exec.Cmd) error {
+	err := cmd.Run()
+	if errors.Is(err, exec.ErrWaitDelay) {
+		return nil
+	}
+	return err
 }
 
 // Ensure makes the prefix ready: created on first use, updated when the
@@ -126,7 +143,8 @@ func (p *Prefix) wait(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, p.Runtime.Wineserver, "-w")
 	cmd.Env = p.Env()
 	cmd.Stdout, cmd.Stderr = p.log(), p.log()
-	return cmd.Run()
+	cmd.WaitDelay = waitDelay
+	return run(cmd)
 }
 
 // ensureZ checks drive Z: is the host's root, as a fresh prefix has it, and
@@ -157,10 +175,13 @@ func (p *Prefix) WindowsVersion(ctx context.Context) (string, error) {
 func (p *Prefix) Check32(ctx context.Context) error {
 	_, err := p.ver(ctx, `C:\windows\syswow64\cmd.exe`)
 	if err != nil {
-		return fmt.Errorf("this Wine can't run 32-bit programs: %w", err)
+		return fmt.Errorf("%w: %w", ErrNo32Bit, err)
 	}
 	return nil
 }
+
+// ErrNo32Bit means a Wine can't run 32-bit programs, as the game is.
+var ErrNo32Bit = errors.New("this Wine can't run 32-bit programs")
 
 func (p *Prefix) ver(ctx context.Context, cmd string) (string, error) {
 	out, err := p.output(ctx, checkTimeout, cmd, "/c", "ver")

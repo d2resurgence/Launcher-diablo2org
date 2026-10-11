@@ -6,11 +6,18 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
-// DefaultPin is the runtime the launcher downloads on this platform.
-var DefaultPin = LinuxPin
+// DefaultPin is the runtime the launcher downloads on this platform. The
+// pinned build is amd64; elsewhere only the system's Wine can be used.
+var DefaultPin = func() Pin {
+	if runtime.GOARCH == "amd64" {
+		return LinuxPin
+	}
+	return Pin{}
+}()
 
 // NeedsRosetta is false off macOS.
 func NeedsRosetta(ctx context.Context) bool { return false }

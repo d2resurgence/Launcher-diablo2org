@@ -65,6 +65,7 @@ func TestUnpack(t *testing.T) {
 		entry{name: "Wine Stable.app/Contents/Resources/wine/bin/wine", typ: tar.TypeReg, body: "#!", mode: 0o755},
 		entry{name: "Wine Stable.app/Contents/Resources/wine/lib/libwine.1.0.dylib", typ: tar.TypeReg, body: "lib"},
 		entry{name: "Wine Stable.app/Contents/Resources/wine/lib/libwine.dylib", typ: tar.TypeSymlink, link: "libwine.1.0.dylib"},
+		entry{name: "Wine Stable.app/Contents/Resources/wine/lib/up", typ: tar.TypeSymlink, link: "../bin/wine"},
 		entry{name: "Wine Stable.app/Contents/Resources/wine/bin/wine64", typ: tar.TypeLink, link: "Wine Stable.app/Contents/Resources/wine/bin/wine"},
 	)
 	if err := Unpack(bytes.NewReader(data), dest); err != nil {
@@ -106,6 +107,10 @@ func TestUnpackRefusesEscapes(t *testing.T) {
 			{name: "inner/evil", typ: tar.TypeReg, body: "x"},
 		},
 		"device": {{name: "dev", typ: tar.TypeChar}},
+		"dot dot after a link": {
+			{name: "y", typ: tar.TypeSymlink, link: "."},
+			{name: "x", typ: tar.TypeSymlink, link: "y/.."},
+		},
 	}
 	for name, entries := range tests {
 		dest := filepath.Join(t.TempDir(), "wine")
