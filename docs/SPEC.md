@@ -83,6 +83,21 @@ written to a temporary file and renamed over the old one, so a hard link is
 replaced rather than written through, and the retail archive it points to
 can't be changed.
 
+**A 1.14 base with a pre-1.14 server.** Blizzard's current installer gives
+1.14. Of its archives, `d2sfx.mpq` alone has an `(attributes)` member in
+the 1.14 format: zlib-compressed and with an MD5 column. A pre-1.14
+`Storm.dll` can't decompress it, and opening the archive fails at startup
+with "The file data is corrupt. File: d2sfx.mpq". Servers don't ship
+`d2sfx.mpq` (SlashDiablo's manifests don't), so a link alone doesn't work.
+For a `link` server whose `game.version` is older than 1.14, the launcher
+therefore places a corrected copy of any base archive that has a
+1.14-format `(attributes)`, rather than a link. The copy is the player's own
+archive with that one member's hash-table entry marked deleted; every other
+byte is unchanged. The format is read from the archive itself, not
+guessed from the folder or version. The base is never changed, and nothing
+is downloaded. A `parent` server reads the base archives in place, so the
+launcher can't do this for one.
+
 ## 3. Server profile
 
 ```jsonc

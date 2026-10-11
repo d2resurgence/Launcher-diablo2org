@@ -1045,11 +1045,12 @@ func (m *Manager) Update(ctx context.Context, id string, allowCopy bool, progres
 	dir := install.ServerDir(base, id)
 
 	if p.Game.BaseArchives == "link" {
-		if err := install.LinkArchives(base, dir, p.Game.NeedsExpansion()); err != nil {
+		pre114 := !strings.HasPrefix(p.Game.Version, "1.14")
+		if err := install.LinkArchives(base, dir, p.Game.NeedsExpansion(), pre114); err != nil {
 			if !allowCopy {
 				return ErrNeedsCopy{Bytes: install.CopySize(report)}
 			}
-			if err := install.CopyArchives(base, dir, p.Game.NeedsExpansion()); err != nil {
+			if err := install.CopyArchives(base, dir, p.Game.NeedsExpansion(), pre114); err != nil {
 				return err
 			}
 		}
