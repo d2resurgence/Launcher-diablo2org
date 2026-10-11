@@ -26,6 +26,7 @@ import (
 	"github.com/diablo2org/launcher/internal/spec"
 	"github.com/diablo2org/launcher/internal/store"
 	"github.com/diablo2org/launcher/internal/sync"
+	"github.com/diablo2org/launcher/internal/wine"
 )
 
 // Manager runs the launcher.
@@ -45,6 +46,11 @@ type Manager struct {
 
 	baseInstaller  BaseInstaller
 	installingBase bool
+
+	// wine runs the game on macOS and Linux; nil on Windows.
+	wine *wine.Host
+	// preferD2GL turns d2gl on where the player hasn't chosen, under Wine.
+	preferD2GL bool
 }
 
 // New returns a manager. clientOpts are passed to every fetch client, which
@@ -533,7 +539,7 @@ type layer struct {
 // enabled returns every component the player has on, with its version,
 // falling back to each component's default. An empty stored version means
 // turned off; CustomVersion means on, with the player's own files.
-func enabled(p *spec.Profile, srv *store.Server) map[string]string {
+func enabled(p *spec.Profile, srv *store.Server, preferD2GL bool) map[string]string {
 	out := map[string]string{}
 	for _, c := range p.Components {
 		v, set := srv.Components[c.ID]
@@ -545,13 +551,66 @@ func enabled(p *spec.Profile, srv *store.Server) map[string]string {
 		}
 	}
 
+	if preferD2GL {
+		preferRenderer(p, srv, out)
+	}
 	return out
+}
+
+// preferRenderer turns a d2gl component on where the player hasn't chosen
+// either way, as the game under Wine runs best with it, unless the player
+// turned on something it conflicts with. Components on only by default that
+// conflict with it go off.
+func preferRenderer(p *spec.Profile, srv *store.Server, on map[string]string) {
+	for _, c := range p.Components {
+		if c.Kind != "d2gl" || len(c.Versions) == 0 {
+			continue
+		}
+		if _, set := srv.Components[c.ID]; set {
+			continue
+		}
+
+		chosen := false
+		for id := range on {
+			if _, set := srv.Components[id]; set && conflicts(p, c.ID, id) {
+				chosen = true
+			}
+		}
+		if chosen {
+			continue
+		}
+
+		for id := range on {
+			if conflicts(p, c.ID, id) {
+				delete(on, id)
+			}
+		}
+		v := c.Default
+		if v == "" {
+			// Versions are listed newest first.
+			v = c.Versions[0].ID
+		}
+		on[c.ID] = v
+	}
+}
+
+// conflicts reports whether components a and b can't be on together,
+// whichever side declared it.
+func conflicts(p *spec.Profile, a, b string) bool {
+	for _, c := range p.Components {
+		for _, other := range c.Conflicts {
+			if c.ID == a && other == b || c.ID == b && other == a {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // wanted returns the components the launcher installs: those enabled at a
 // real version. Custom components are the player's to manage.
-func wanted(p *spec.Profile, srv *store.Server) map[string]string {
-	out := enabled(p, srv)
+func wanted(p *spec.Profile, srv *store.Server, preferD2GL bool) map[string]string {
+	out := enabled(p, srv, preferD2GL)
 	for id, v := range out {
 		if v == CustomVersion {
 			delete(out, id)
@@ -674,7 +733,7 @@ func (m *Manager) layers(ctx context.Context, id string, p *spec.Profile, srv *s
 	}
 	out := []layer{{url: channel.Manifest, manifest: base}}
 
-	want := wanted(p, srv)
+	want := wanted(p, srv, m.preferD2GL)
 	for _, c := range p.Components {
 		v, on := want[c.ID]
 		if !on {
@@ -790,7 +849,7 @@ func (m *Manager) plan(ctx context.Context, id string) (*spec.Profile, []layer, 
 		return nil, nil, nil, nil, nil, err
 	}
 
-	on := enabled(p, srv)
+	on := enabled(p, srv, m.preferD2GL)
 
 	// Files a custom component could hold are the player's: never written,
 	// repaired or removed, even when another layer lists the same path.
@@ -843,7 +902,7 @@ func (m *Manager) plan(ctx context.Context, id string) (*spec.Profile, []layer, 
 		}
 	}
 
-	want := wanted(p, srv)
+	want := wanted(p, srv, m.preferD2GL)
 	for _, c := range p.Components {
 		applied, recorded := srv.Applied[c.ID]
 
@@ -1033,12 +1092,15 @@ func (m *Manager) Play(ctx context.Context, id string) error {
 	if base == "" {
 		return errors.New("choose your Diablo II folder first")
 	}
+	if h := m.wineHost(); h != nil && !h.Ready(ctx) {
+		return ErrWineNotReady
+	}
 
 	m.mu.Lock()
 	srv := m.state.Server(id)
 	c := launch.Choices{
 		// Custom components still count: their flags and d2gl profiles apply.
-		Components: enabled(p, srv),
+		Components: enabled(p, srv, m.preferD2GL),
 		Flags:      append([]string{}, srv.Flags...),
 		Instances:  srv.Instances,
 		SplitD2GL:  srv.SplitD2GL,

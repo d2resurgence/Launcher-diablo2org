@@ -46,7 +46,7 @@ func (m *Manager) Choices(ctx context.Context, id string) (Choices, error) {
 
 	return Choices{
 		Channel:    channel,
-		Components: enabled(p, srv),
+		Components: enabled(p, srv, m.preferD2GL),
 		Instances:  srv.Instances,
 		SplitD2GL:  srv.SplitD2GL,
 
@@ -173,7 +173,7 @@ func (m *Manager) Settings(ctx context.Context, id string) ([]SettingValue, erro
 
 	m.mu.Lock()
 	srv := m.state.Server(id)
-	on := enabled(p, srv)
+	on := enabled(p, srv, m.preferD2GL)
 	flags := map[string]bool{}
 	for _, f := range srv.Flags {
 		flags[f] = true

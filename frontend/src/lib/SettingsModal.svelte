@@ -364,6 +364,13 @@
               </select>
             </div>
 
+            {#if c.kind === "d2gl" && app.overview?.wine?.needed && !(data.choices.components ?? {})[c.id]}
+              <p class="mt-2 text-[12px] text-date" role="note">
+                {c.name} is recommended on this system. Without it the game runs in a window, as full screen under Wine can
+                change your display's resolution.
+              </p>
+            {/if}
+
             {#if custom}
               <div class="mt-3 flex items-start gap-4 rounded-[3px] border border-[#6b4a1c] bg-[#1a140b] p-3" role="note">
                 <p class="flex-1 text-[12px] leading-snug text-[#d9b77a]">

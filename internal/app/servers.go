@@ -64,6 +64,8 @@ type Overview struct {
 	Error      string            `json:"error"`
 	// FirstRun asks the page to show the welcome screen.
 	FirstRun bool `json:"firstRun"`
+	// Wine is whether the game runs under Wine here, and if it's ready.
+	Wine core.WineStatus `json:"wine"`
 }
 
 // Overview loads the base install check and every server. On the first run it
@@ -75,7 +77,7 @@ func (s *ServerService) Overview(ctx context.Context) Overview {
 	s.m.ImportLegacy(ctx, core.LegacyConfigPath())
 	s.m.DetectBase()
 
-	o := Overview{Base: s.m.Base(), Favourites: s.m.Favourites(), Servers: []core.ServerInfo{}, FirstRun: s.m.FirstRun()}
+	o := Overview{Base: s.m.Base(), Favourites: s.m.Favourites(), Servers: []core.ServerInfo{}, FirstRun: s.m.FirstRun(), Wine: s.m.WineStatus(ctx)}
 	if err != nil {
 		slog.Warn("servers", "err", err)
 		o.Error = err.Error()

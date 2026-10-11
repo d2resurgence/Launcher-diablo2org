@@ -253,3 +253,85 @@ func TestLaunchNotInstalled(t *testing.T) {
 		t.Error("registry written for a launch that never happened")
 	}
 }
+
+// committingRegistry counts commits, as a Wine prefix's registry would
+// flush them.
+type committingRegistry struct {
+	fakeRegistry
+	commits int
+}
+
+func (c *committingRegistry) Commit() error { c.commits++; return nil }
+
+// winePaths stands in for wine.WinPath and wine.UnixPath, which this
+// package can't import.
+var winePaths = Paths{
+	ToGame: func(p string) string { return "Z:" + strings.ReplaceAll(filepath.ToSlash(p), "/", `\`) },
+	FromGame: func(p string) (string, bool) {
+		if !strings.HasPrefix(p, "Z:") {
+			return "", false
+		}
+		return filepath.FromSlash(strings.TrimSuffix(strings.ReplaceAll(p[2:], `\`, "/"), "/")), true
+	},
+	Sep: `\`,
+}
+
+func TestLaunchMappedPaths(t *testing.T) {
+	if filepath.Separator != '/' {
+		t.Skip("the stand-in mapping is for host paths with forward slashes")
+	}
+	base := t.TempDir()
+	server := filepath.Join(base, "slashdiablo")
+	os.MkdirAll(server, 0o755)
+	os.WriteFile(filepath.Join(server, "Game.exe"), []byte("exe"), 0o644)
+
+	reg := &committingRegistry{fakeRegistry: fakeRegistry{strings: map[string]string{}}}
+	var started []Box
+	l := NewWithPaths(reg, func(b Box) error { started = append(started, b); return nil }, winePaths)
+
+	p := profile()
+	p.Game.Saves = "isolated"
+	if err := l.Launch(context.Background(), base, server, p, Choices{}, 0); err != nil {
+		t.Fatal(err)
+	}
+	want := winePaths.ToGame(filepath.Join(server, "Save")) + `\`
+	if reg.strings["Save Path"] != want {
+		t.Errorf("Save Path = %q, want %q", reg.strings["Save Path"], want)
+	}
+	if reg.commits != 1 {
+		t.Errorf("committed %d times, want once per launch", reg.commits)
+	}
+	// The box itself still runs from host paths.
+	if started[0].Exe != filepath.Join(server, "Game.exe") || started[0].Dir != server {
+		t.Errorf("box %+v", started[0])
+	}
+
+	// The isolated Z: path is recognised, so a shared server replaces it.
+	if err := l.Launch(context.Background(), base, server, profile(), Choices{}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if want := winePaths.ToGame(filepath.Join(base, "Save")) + `\`; reg.strings["Save Path"] != want {
+		t.Errorf("Save Path = %q after an isolated server, want %q", reg.strings["Save Path"], want)
+	}
+
+	// A path the player chose on another drive stays.
+	reg.strings["Save Path"] = `D:\Saves\`
+	l.Launch(context.Background(), base, server, profile(), Choices{}, 0)
+	if reg.strings["Save Path"] != `D:\Saves\` {
+		t.Errorf("Save Path = %q, want the player's D: path kept", reg.strings["Save Path"])
+	}
+}
+
+func TestBoxesMarkD2GL(t *testing.T) {
+	p := profile()
+	p.Components = append(p.Components, spec.Component{ID: "d2gl", Kind: "d2gl", Flags: []string{"-3dfx"}})
+
+	off, err := Boxes("/srv", p, Choices{})
+	if err != nil || off[0].D2GL {
+		t.Errorf("d2gl off: %+v, %v", off, err)
+	}
+	on, err := Boxes("/srv", p, Choices{Components: map[string]string{"d2gl": "1.3.3"}})
+	if err != nil || !on[0].D2GL {
+		t.Errorf("d2gl on: %+v, %v", on, err)
+	}
+}

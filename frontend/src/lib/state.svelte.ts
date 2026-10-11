@@ -17,7 +17,7 @@ import type {
 import type { Release } from "../../bindings/github.com/diablo2org/launcher/internal/updates";
 import { errorText } from "./format";
 
-export type Page = "welcome" | "launch" | "ladder" | "catalog" | "checker";
+export type Page = "welcome" | "launch" | "ladder" | "catalog" | "checker" | "wine";
 
 // The last server shown is a convenience for this machine only, so it lives
 // in the webview's storage, which can be unavailable.
@@ -141,6 +141,20 @@ export class ServerData {
 
   async play() {
     this.error = "";
+    // Under Wine, an unset or outdated Wine is set up first, on its own page.
+    if (app.overview?.wine?.needed) {
+      try {
+        const wine = await ServerService.WineStatus();
+        if (!wine.ready) {
+          app.page = "wine";
+          return;
+        }
+      } catch (err) {
+        this.error = errorText(err);
+        return;
+      }
+    }
+
     this.busy = "launching";
     try {
       await ServerService.Play(this.id);
@@ -398,6 +412,21 @@ class AppState {
       this.updateError = errorText(err);
       this.launcherUpdate = null;
     }
+  }
+
+  // Wine is set up: back to the server the player was on.
+  async wineReady() {
+    try {
+      this.overview = await ServerService.Overview();
+    } catch (err) {
+      this.error = errorText(err);
+    }
+    this.leaveWineSetup();
+  }
+
+  leaveWineSetup() {
+    if (this.selected && this.info(this.selected)?.profile) this.page = "launch";
+    else this.page = "catalog";
   }
 
   async chooseBase() {

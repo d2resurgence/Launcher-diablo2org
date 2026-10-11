@@ -173,3 +173,30 @@ func TestSystemWineRejection(t *testing.T) {
 		t.Error("another version rejected")
 	}
 }
+
+func TestQuick(t *testing.T) {
+	rt, _ := fakeRuntime(t, "11.0_1")
+	root := t.TempDir()
+	s := Setup{PrefixDir: filepath.Join(root, "prefix")}
+
+	if _, err := s.Quick(context.Background()); !errors.Is(err, ErrNotReady) {
+		t.Fatalf("nothing set up: %v", err)
+	}
+
+	// A prefix set up by rt is ready for rt, and not for another version.
+	p := &Prefix{Dir: s.PrefixDir, Runtime: rt}
+	if _, err := p.Ensure(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.readyIn(rt, s.PrefixDir); got == nil || got.Dir != s.PrefixDir {
+		t.Errorf("readyIn = %+v", got)
+	}
+	other := *rt
+	other.Version = "11.0_2"
+	if s.readyIn(&other, s.PrefixDir) != nil {
+		t.Error("ready for a runtime that didn't set it up")
+	}
+	if s.readyIn(rt, s.SystemPrefixDir()) != nil {
+		t.Error("the system prefix is ready without being set up")
+	}
+}
