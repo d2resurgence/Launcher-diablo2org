@@ -1,0 +1,34 @@
+{
+  "version": "v0.2.0",
+  "url": "https://github.com/jaenster/blizzard-legacy-dl/releases/download/v0.2.0/",
+  "license": {
+    "url": "https://raw.githubusercontent.com/jaenster/blizzard-legacy-dl/v0.2.0/LICENSE",
+    "sha256": "0327761eddf0ce3554ccfd29fd64b0da023c510f6b69cfb3265dfc7e269b8962"
+  },
+  "assets": {
+    "windows/amd64": {
+      "name": "blizzard-legacy-dl-x86_64-windows.exe",
+      "sha256": "62320d55ecd03aed29b888c20ef5a8bb04966a53a1ee8cbc0d4749b92b52f18c"
+    },
+    "windows/arm64": {
+      "name": "blizzard-legacy-dl-aarch64-windows.exe",
+      "sha256": "db1af6c8a09dc5151093bdaec2bf6f9933ae7de0e99d22119564e58b6b187893"
+    },
+    "darwin/amd64": {
+      "name": "blizzard-legacy-dl-x86_64-macos",
+      "sha256": "743f3a1ad4af35155bf6c84d81617ec58d01d7d35d0e85a272c40067a1ac9348"
+    },
+    "darwin/arm64": {
+      "name": "blizzard-legacy-dl-aarch64-macos",
+      "sha256": "792aee89c438135e36d10db0327d6218fcbf99fc1979b1fb07211e34a0164036"
+    },
+    "linux/amd64": {
+      "name": "blizzard-legacy-dl-x86_64-linux-musl",
+      "sha256": "cdb125bbd08f41aee9ea4f4db5b0dc082483304c5a94850087564456c684c716"
+    },
+    "linux/arm64": {
+      "name": "blizzard-legacy-dl-aarch64-linux-musl",
+      "sha256": "b305b9a25dd51ed5c983b7aa98743affbf033fe42ebb597ddfeb1179f4d21c27"
+    }
+  }
+}

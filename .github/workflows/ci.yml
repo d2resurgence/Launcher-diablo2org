@@ -106,7 +106,7 @@ jobs:
         if: env.SIGN == 'true'
         shell: pwsh
         run: |
-          $files = @(Get-Item bin/launcher.exe, bin/d2pack.exe) + @(Get-ChildItem bin/*-installer.exe)
+          $files = @(Get-Item bin/launcher.exe, bin/d2pack.exe) + @(Get-ChildItem bin/*-installer.exe) + @(Get-ChildItem bin/legacy-dl/windows-*/blizzard-legacy-dl.exe)
           $subject = $null
           foreach ($f in $files) {
             $sig = Get-AuthenticodeSignature $f

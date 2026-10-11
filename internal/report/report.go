@@ -18,6 +18,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/diablo2org/launcher/internal/cdkey"
 	"github.com/diablo2org/launcher/internal/install"
 	"github.com/diablo2org/launcher/internal/logs"
 	"github.com/diablo2org/launcher/internal/paths"
@@ -397,8 +398,10 @@ func readCapped(root, rel string, limit int64) ([]byte, error) {
 }
 
 // redact replaces the home folder, written either way round and as JSON
-// escapes it, with %USERPROFILE%.
+// escapes it, with %USERPROFILE%, and anything shaped like a CD key.
 func redact(data []byte, home string) []byte {
+	data = cdkey.Redact(data)
+
 	home = strings.TrimRight(home, `\/`)
 	if len(home) < 4 {
 		return data

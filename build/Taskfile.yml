@@ -10,6 +10,26 @@ tasks:
     cmds:
       - go mod tidy
 
+  fetch:legacy-dl:
+    summary: Fetches the pinned blizzard-legacy-dl binary for a target, checked against build/legacy-dl.json
+    desc: |
+      The launcher ships blizzard-legacy-dl beside itself to install the base
+      game from Blizzard's CDN. It lands in bin/legacy-dl/<os>-<arch>/, with
+      its licence in bin/legacy-dl/LICENSE.txt for the app's notices.
+
+      Usage: task common:fetch:legacy-dl TARGET_OS=windows TARGET_ARCH=amd64
+    sources:
+      - build/legacy-dl.json
+    generates:
+      - '{{.BIN_DIR}}/legacy-dl/{{.TARGET_OS}}-{{.TARGET_ARCH}}/{{.LEGACY_DL_NAME}}'
+      - '{{.BIN_DIR}}/legacy-dl/LICENSE.txt'
+    cmds:
+      - go run ./build/legacydl -pin build/legacy-dl.json -os {{.TARGET_OS}} -arch {{.TARGET_ARCH}} -out "{{.BIN_DIR}}/legacy-dl/{{.TARGET_OS}}-{{.TARGET_ARCH}}/{{.LEGACY_DL_NAME}}" -license "{{.BIN_DIR}}/legacy-dl/LICENSE.txt"
+    vars:
+      TARGET_OS: '{{.TARGET_OS | default .GOOS | default OS}}'
+      TARGET_ARCH: '{{.TARGET_ARCH | default ARCH}}'
+      LEGACY_DL_NAME: 'blizzard-legacy-dl{{if eq .TARGET_OS "windows"}}.exe{{end}}'
+
   install:frontend:deps:
     summary: Install frontend dependencies
     run: once

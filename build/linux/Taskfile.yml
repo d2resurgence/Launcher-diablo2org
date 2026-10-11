@@ -130,6 +130,10 @@ tasks:
     summary: Creates a deb package
     deps:
       - task: build
+      - task: common:fetch:legacy-dl
+        vars:
+          TARGET_OS: linux
+          TARGET_ARCH: amd64
     cmds:
       - task: generate:dotdesktop
       - task: generate:deb
@@ -138,6 +142,10 @@ tasks:
     summary: Creates a rpm package
     deps:
       - task: build
+      - task: common:fetch:legacy-dl
+        vars:
+          TARGET_OS: linux
+          TARGET_ARCH: amd64
     cmds:
       - task: generate:dotdesktop
       - task: generate:rpm
@@ -146,6 +154,10 @@ tasks:
     summary: Creates a arch linux packager package
     deps:
       - task: build
+      - task: common:fetch:legacy-dl
+        vars:
+          TARGET_OS: linux
+          TARGET_ARCH: amd64
     cmds:
       - task: generate:dotdesktop
       - task: generate:aur

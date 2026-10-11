@@ -74,10 +74,10 @@ ManifestDPIAware true
 
 !insertmacro MUI_LANGUAGE "English" # Set the Language of the installer
 
-# Release builds are signed: the launcher before it goes in, then the
-# uninstaller and this installer as they're written. CI sets LAUNCHER_SIGN on
-# tagged builds only, as each signing counts against the eSigner plan; see
-# ../sign.ps1. An unset variable stays as the literal text, so isn't "true".
+# Release builds are signed: the launcher and blizzard-legacy-dl before they
+# go in, then the uninstaller and this installer as they're written. CI sets
+# LAUNCHER_SIGN on tagged builds only, as each signing counts against the
+# eSigner plan; see ../sign.ps1. An unset variable stays as the literal text, so isn't "true".
 !if "$%LAUNCHER_SIGN%" == "true"
     !define SIGN 'pwsh -NoProfile -NonInteractive -File "${__FILEDIR__}\..\sign.ps1"'
     !ifdef ARG_WAILS_AMD64_BINARY
@@ -85,6 +85,9 @@ ManifestDPIAware true
     !endif
     !ifdef ARG_WAILS_ARM64_BINARY
         !system '${SIGN} "${ARG_WAILS_ARM64_BINARY}"' = 0
+    !endif
+    !ifdef ARG_LEGACY_DL
+        !system '${SIGN} "${ARG_LEGACY_DL}"' = 0
     !endif
     !uninstfinalize '${SIGN} "%1"' = 0
     !finalize '${SIGN} "%1"' = 0
@@ -111,6 +114,13 @@ Section
     SetOutPath $INSTDIR
     
     !insertmacro wails.files
+
+    # blizzard-legacy-dl installs the base game from Blizzard's CDN; the
+    # launcher looks for it beside itself. MIT licensed: its notice ships too.
+    !ifdef ARG_LEGACY_DL
+        File "/oname=blizzard-legacy-dl.exe" "${ARG_LEGACY_DL}"
+        File "/oname=blizzard-legacy-dl-LICENSE.txt" "${ARG_LEGACY_DL_LICENSE}"
+    !endif
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"

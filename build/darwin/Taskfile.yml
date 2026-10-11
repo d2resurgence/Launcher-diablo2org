@@ -167,12 +167,34 @@ tasks:
         fi
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      - task: bundle:legacy-dl
+        vars:
+          APP: '{{.BIN_DIR}}/{{.APP_NAME}}.app'
       - task: '{{if eq OS "darwin"}}codesign:adhoc{{else}}codesign:skip{{end}}'
+
+  bundle:legacy-dl:
+    summary: Puts a universal blizzard-legacy-dl, which installs the base game, in the bundle's Resources/bin
+    internal: true
+    deps:
+      - task: common:fetch:legacy-dl
+        vars: {TARGET_OS: darwin, TARGET_ARCH: amd64}
+      - task: common:fetch:legacy-dl
+        vars: {TARGET_OS: darwin, TARGET_ARCH: arm64}
+    cmds:
+      - mkdir -p "{{.APP}}/Contents/Resources/bin"
+      - cmd: lipo -create -output "{{.APP}}/Contents/Resources/bin/blizzard-legacy-dl" "{{.BIN_DIR}}/legacy-dl/darwin-amd64/blizzard-legacy-dl" "{{.BIN_DIR}}/legacy-dl/darwin-arm64/blizzard-legacy-dl"
+        platforms: [darwin]
+      - cmd: wails3 tool lipo -output "{{.APP}}/Contents/Resources/bin/blizzard-legacy-dl" -input "{{.BIN_DIR}}/legacy-dl/darwin-amd64/blizzard-legacy-dl" -input "{{.BIN_DIR}}/legacy-dl/darwin-arm64/blizzard-legacy-dl"
+        platforms: [linux, windows]
+      - chmod 755 "{{.APP}}/Contents/Resources/bin/blizzard-legacy-dl"
+      - cp "{{.BIN_DIR}}/legacy-dl/LICENSE.txt" "{{.APP}}/Contents/Resources/blizzard-legacy-dl-LICENSE.txt"
 
   codesign:adhoc:
     summary: Ad-hoc signs the app bundle (macOS only)
     internal: true
     cmds:
+      # Nested code first: --deep doesn't reach Resources/bin.
+      - codesign --force --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/bin/blizzard-legacy-dl"
       - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.app"
 
   codesign:skip:
