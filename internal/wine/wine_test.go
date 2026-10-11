@@ -155,6 +155,7 @@ func TestEnv(t *testing.T) {
 		"WINEPREFIX=/data/prefix",
 		"WINEDEBUG=-all",
 		"WINEDLLOVERRIDES=mscoree,mshtml=;ddraw=n,b",
+		"MVK_CONFIG_LOG_LEVEL=0",
 	}
 	if !slices.Equal(env, want) {
 		t.Errorf("Env =\n%q\nwant\n%q", env, want)

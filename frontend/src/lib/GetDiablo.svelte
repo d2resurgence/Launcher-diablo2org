@@ -5,8 +5,11 @@
   import type { BaseSetup, ServerInfo } from "../../bindings/github.com/diablo2org/launcher/internal/core";
   import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
+  import RosettaPrompt from "./RosettaPrompt.svelte";
+  import StepList from "./StepList.svelte";
   import { bytes, errorText } from "./format";
   import { app } from "./state.svelte";
+  import { WineSetup, type Row } from "./wine.svelte";
 
   // The "Get Diablo II" steps of the welcome screen: install the game, or
   // use the one already installed; then, for an install, the CD keys and
@@ -34,7 +37,11 @@
   let serverState = $state<"pending" | "active" | "done" | "failed">("pending");
   let cacheCleared = $state(false);
 
+  // On macOS and Linux the game runs under Wine, set up before the download.
+  const wineSetup = new WineSetup();
+
   const o = $derived(app.overview);
+  const wineNeeded = $derived(!!o?.wine?.needed && !o?.wine?.ready);
   const first = $derived(picked[0]);
   const firstData = $derived(first ? app.server(first.id) : null);
 
@@ -54,7 +61,7 @@
       owner = s.owner;
       // 1.13c unless every server picked is a 1.14 one.
       const versions = picked.map((p) => p.profile?.game.version ?? "");
-      version = versions.length && versions.every((v) => family(v) === "1.14") && s.versions.includes("1.14d") ? "1.14d" : s.defaultVersion;
+      version = versions.length && versions.every((v) => family(v) === "1.14") && (s.versions ?? []).includes("1.14d") ? "1.14d" : s.defaultVersion;
       // A game the launcher found, or one it can't install: use what's there.
       if (app.baseReady || !s.available) choice = "existing";
     });
@@ -89,6 +96,16 @@
     progress = null;
     serverState = "pending";
     cancelled = false;
+
+    if (wineNeeded && !wineSetup.done) {
+      const ok = await wineSetup.run();
+      if (!ok) {
+        installing = false;
+        if (!wineSetup.needsRosetta && !cancelled) failure = wineSetup.error || "Wine couldn't be set up.";
+        if (cancelled) step = "keys";
+        return;
+      }
+    }
 
     try {
       running = ServerService.InstallBase({ version, dir, classicKey: norm(classicKey), expansionKey: norm(expansionKey), owner: owner.trim() });
@@ -133,6 +150,7 @@
 
   function cancel() {
     cancelled = true;
+    wineSetup.cancel();
     running?.cancel();
   }
 
@@ -147,12 +165,14 @@
 
   async function finish() {
     finishing = true;
+    const needsWine = wineNeeded && !wineSetup.done;
     await onFinish();
     finishing = false;
+    // An install the player already had still needs Wine set up here.
+    if (needsWine && app.baseReady) app.page = "wine";
   }
 
   // Each row of the progress list: done, under way, waiting, or failed.
-  type Row = { label: string; state: "pending" | "active" | "done" | "failed"; detail: string };
   const product = (code: string) => (code === "D2XP" ? "Lord of Destruction" : "Diablo II");
   const rows = $derived.by((): Row[] => {
     const p = progress;
@@ -168,8 +188,14 @@
     if (p?.stage === "install") installDetail = `Installing ${product(p.product)}`;
     if (p?.stage === "patch") installDetail = `Patching to ${version}`;
 
+    const wineFirst = wineNeeded && !wineSetup.done;
     const list: Row[] = [
-      { label: "Download", state: downloaded ? "done" : failed ? "failed" : "active", detail: downloaded ? "" : downloadDetail },
+      ...(wineNeeded || wineSetup.done ? wineSetup.rows : []),
+      {
+        label: "Download",
+        state: downloaded ? "done" : failed && !wineFirst ? "failed" : wineFirst ? "pending" : "active",
+        detail: downloaded || wineFirst ? "" : downloadDetail,
+      },
       {
         label: "Install",
         state: ok ? "done" : failed && downloaded ? "failed" : p && p.stage !== "download" ? "active" : "pending",
@@ -356,28 +382,11 @@
     {/if}
   </p>
 
-  <ol class="mt-6 grid max-w-xl gap-2">
-    {#each rows as row (row.label)}
-      <li class="flex items-center gap-3 rounded border border-line bg-panel/90 px-4 py-3">
-        <span
-          class={[
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]",
-            row.state === "done" && "border-accent bg-accent",
-            row.state === "active" && "animate-pulse border-accent",
-            row.state === "failed" && "border-bad text-bad",
-            row.state === "pending" && "border-edge",
-          ]}
-          aria-label={row.state}
-        >
-          {#if row.state === "done"}<Icon name="check" size={12} />{:else if row.state === "failed"}!{/if}
-        </span>
-        <span class="title text-[13px]">{row.label}</span>
-        {#if row.detail}
-          <span class="ml-auto truncate text-[12px] text-muted" title={row.detail}>{row.detail}</span>
-        {/if}
-      </li>
-    {/each}
-  </ol>
+  <StepList {rows} />
+  {#if wineSetup.needsRosetta}
+    <!-- install skips Wine, now set up, and carries on with the download. -->
+    <RosettaPrompt wine={wineSetup} onReady={install} onFailed={() => (failure = wineSetup.error || "Wine couldn't be set up.")} />
+  {/if}
 
   {#if failure}
     <p class="mt-4 max-w-xl whitespace-pre-line text-[12px] text-bad">{failure}</p>

@@ -35,6 +35,9 @@ type Box struct {
 	Exe  string
 	Args []string
 	Dir  string
+	// D2GL is set when the d2gl renderer is on, which a starter running the
+	// game under Wine needs to know.
+	D2GL bool
 }
 
 // d2glProfile is the d2gl config a box uses when profiles are split. d2gl
@@ -110,7 +113,7 @@ func Boxes(serverDir string, p *spec.Profile, c Choices) ([]Box, error) {
 		if d2gl && c.SplitD2GL {
 			args = append(args, "-config", d2glProfile(i))
 		}
-		boxes[i] = Box{Exe: exe, Args: args, Dir: serverDir}
+		boxes[i] = Box{Exe: exe, Args: args, Dir: serverDir, D2GL: d2gl}
 	}
 
 	return boxes, nil
@@ -126,8 +129,41 @@ type Registry interface {
 	SetString(name, value string) error
 }
 
+// GameRegistry is a Registry told which game a launch is for, by its exe's
+// file name and game.version: under Wine, an older game needs Wine to
+// report an older Windows to it.
+type GameRegistry interface {
+	SetGame(exe, version string) error
+}
+
+// Committer is a Registry that holds its writes until Commit, such as one
+// writing into a Wine prefix, where every write costs a process. Launch
+// commits once the settings are all written, before starting any box.
+type Committer interface {
+	Commit() error
+}
+
 // Starter starts a game process.
 type Starter func(Box) error
+
+// Paths maps host paths to the paths the game sees, for registry values. On
+// Windows they're the same; under Wine the game sees them on drive Z:.
+type Paths struct {
+	// ToGame is a host path as the game sees it.
+	ToGame func(string) string
+	// FromGame is the host path for one the game sees, or false if it has
+	// none, such as a path on another Wine drive.
+	FromGame func(string) (string, bool)
+	// Sep is the game's path separator.
+	Sep string
+}
+
+// HostPaths is the identity mapping, for the game running natively.
+var HostPaths = Paths{
+	ToGame:   func(p string) string { return p },
+	FromGame: func(p string) (string, bool) { return p, true },
+	Sep:      string(filepath.Separator),
+}
 
 // Launcher starts servers one at a time. Battle.net settings are global, so
 // two servers launching together could each pick up the other's gateway.
@@ -135,12 +171,20 @@ type Launcher struct {
 	mu       sync.Mutex
 	registry Registry
 	start    Starter
+	paths    Paths
 	sleep    func(context.Context, time.Duration) error
 }
 
-// New returns a launcher using the given registry and process starter.
+// New returns a launcher using the given registry and process starter, for
+// the game running natively.
 func New(r Registry, start Starter) *Launcher {
-	return &Launcher{registry: r, start: start, sleep: sleepCtx}
+	return NewWithPaths(r, start, HostPaths)
+}
+
+// NewWithPaths returns a launcher whose registry values hold paths as
+// mapped by paths, such as for the game running under Wine.
+func NewWithPaths(r Registry, start Starter, paths Paths) *Launcher {
+	return &Launcher{registry: r, start: start, paths: paths, sleep: sleepCtx}
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) error {
@@ -172,6 +216,16 @@ func (l *Launcher) Launch(ctx context.Context, base, serverDir string, p *spec.P
 
 	if err := l.configure(base, serverDir, p); err != nil {
 		return fmt.Errorf("setting up Battle.net: %w", err)
+	}
+	if g, ok := l.registry.(GameRegistry); ok {
+		if err := g.SetGame(filepath.Base(boxes[0].Exe), p.Game.Version); err != nil {
+			return fmt.Errorf("setting up the game: %w", err)
+		}
+	}
+	if c, ok := l.registry.(Committer); ok {
+		if err := c.Commit(); err != nil {
+			return fmt.Errorf("saving the game's settings: %w", err)
+		}
 	}
 
 	for i, b := range boxes {
@@ -239,8 +293,13 @@ func (l *Launcher) setSavePath(base, serverDir string, p *spec.Profile) error {
 		if err != nil {
 			return err
 		}
-		if current != "" && !isolatedSavePath(base, current) {
-			return nil
+		if current != "" {
+			// A path the player chose stays, including one with no host
+			// path, such as on another Wine drive.
+			host, ok := l.paths.FromGame(current)
+			if !ok || !isolatedSavePath(base, host) {
+				return nil
+			}
 		}
 	}
 
@@ -248,7 +307,11 @@ func (l *Launcher) setSavePath(base, serverDir string, p *spec.Profile) error {
 		return err
 	}
 
-	return l.registry.SetString("Save Path", save+string(filepath.Separator))
+	value := l.paths.ToGame(save)
+	if !strings.HasSuffix(value, l.paths.Sep) {
+		value += l.paths.Sep
+	}
+	return l.registry.SetString("Save Path", value)
 }
 
 // serverID is the profile spec's id pattern.

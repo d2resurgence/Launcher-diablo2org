@@ -147,6 +147,26 @@ func (p *Prefix) wait(ctx context.Context) error {
 	return run(cmd)
 }
 
+// Persist starts the prefix's wineserver, or keeps it, running for 30
+// seconds after its last program ends, so the registry calls and the game
+// that follow share one server rather than each starting their own.
+func (p *Prefix) Persist(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
+	defer cancel()
+
+	// No output: the server it starts would hold the log's pipe open.
+	cmd := exec.CommandContext(ctx, p.Runtime.Wineserver, "-p30")
+	cmd.Env = p.Env()
+	cmd.WaitDelay = waitDelay
+	err := run(cmd)
+	// 2 means a server is already running for the prefix, which will do.
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 2 {
+		return nil
+	}
+	return err
+}
+
 // ensureZ checks drive Z: is the host's root, as a fresh prefix has it, and
 // puts it back if a player's tinkering removed it. Every path the launcher
 // hands to Windows programs is on Z:.

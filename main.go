@@ -26,6 +26,7 @@ import (
 	"github.com/diablo2org/launcher/internal/logs"
 	"github.com/diablo2org/launcher/internal/store"
 	"github.com/diablo2org/launcher/internal/updates"
+	"github.com/diablo2org/launcher/internal/wine"
 )
 
 // The built frontend is embedded, so the launcher ships as a single exe.
@@ -63,6 +64,7 @@ func init() {
 	application.RegisterEvent[app.UpdateProgress]("update:progress")
 	application.RegisterEvent[app.LauncherUpdateProgress]("launcher:update")
 	application.RegisterEvent[basegame.Progress]("base:progress")
+	application.RegisterEvent[wine.Progress]("wine:progress")
 }
 
 func main() {
@@ -104,12 +106,22 @@ func main() {
 		listing = core.DirListing(dir)
 	}
 
-	manager, err := core.New(st, listing, launch.New(launch.SystemRegistry{}, launch.StartProcess), clientOpts...)
+	root := appDataRoot(dataDir)
+	wineHost := newWineHost(dataDir, root)
+	launcher := launch.New(launch.SystemRegistry{}, launch.StartProcess)
+	if wineHost != nil {
+		launcher = launch.NewWithPaths(wineHost.Registry(), wineHost.Start, wine.Paths())
+	}
+
+	manager, err := core.New(st, listing, launcher, clientOpts...)
 	if err != nil {
 		log.Fatal(err)
 	}
+	if wineHost != nil {
+		manager.SetWine(wineHost)
+	}
 
-	manager.SetBaseInstaller(baseInstaller(dataDir))
+	manager.SetBaseInstaller(baseInstaller(root))
 
 	var a *application.App
 	var window *application.WebviewWindow
@@ -264,16 +276,25 @@ func windowsOptions() application.WindowsOptions {
 	return o
 }
 
-// baseInstaller installs the base game into the launcher's app data folder,
-// or a test run's data folder, with the legacy-dl that ships beside it.
-func baseInstaller(dataDir string) core.BaseInstaller {
-	root := dataDir
-	if os.Getenv(envData) == "" {
-		dir, err := store.AppDataDir()
-		if err != nil {
-			return core.BaseInstaller{Unavailable: err.Error()}
-		}
-		root = dir
+// appDataRoot is where the base game, Wine and their downloads go: the app
+// data folder, or a test run's data folder. "" if there's none.
+func appDataRoot(dataDir string) string {
+	if os.Getenv(envData) != "" {
+		return dataDir
+	}
+	dir, err := store.AppDataDir()
+	if err != nil {
+		slog.Warn("no app data folder", "err", err)
+		return ""
+	}
+	return dir
+}
+
+// baseInstaller installs the base game into the app data folder with the
+// legacy-dl that ships beside the launcher.
+func baseInstaller(root string) core.BaseInstaller {
+	if root == "" {
+		return core.BaseInstaller{Unavailable: "there's no folder to install Diablo II into"}
 	}
 
 	b := core.BaseInstaller{

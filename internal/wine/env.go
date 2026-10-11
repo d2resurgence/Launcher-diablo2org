@@ -24,7 +24,7 @@ func Env(parent []string, prefix, debug string, overrides ...string) []string {
 	env := slices.DeleteFunc(slices.Clone(parent), func(kv string) bool {
 		name, _, _ := strings.Cut(kv, "=")
 		switch name {
-		case "WINEPREFIX", "WINEDEBUG", "WINEDLLOVERRIDES", "WINEARCH", "WINELOADER", "WINESERVER":
+		case "WINEPREFIX", "WINEDEBUG", "WINEDLLOVERRIDES", "WINEARCH", "WINELOADER", "WINESERVER", "MVK_CONFIG_LOG_LEVEL":
 			return true
 		}
 		return false
@@ -35,5 +35,8 @@ func Env(parent []string, prefix, debug string, overrides ...string) []string {
 		"WINEPREFIX="+prefix,
 		"WINEDEBUG="+debug,
 		"WINEDLLOVERRIDES="+strings.Join(dlls, ";"),
+		// macOS Wine's MoltenVK otherwise lists every Vulkan extension to
+		// stderr on each start, which would fill the log.
+		"MVK_CONFIG_LOG_LEVEL=0",
 	)
 }

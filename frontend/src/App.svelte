@@ -8,6 +8,7 @@
   import SettingsModal from "./lib/SettingsModal.svelte";
   import TopBar from "./lib/TopBar.svelte";
   import Welcome from "./lib/Welcome.svelte";
+  import WineSetupPage from "./lib/WineSetupPage.svelte";
   import { app } from "./lib/state.svelte";
 
   app.load();
@@ -70,6 +71,8 @@
         <Catalog />
       {:else if app.page === "checker"}
         <ProfileChecker />
+      {:else if app.page === "wine"}
+        <WineSetupPage />
       {:else if app.current?.profile}
         {#key app.selected}
           {#if app.page === "ladder"}
