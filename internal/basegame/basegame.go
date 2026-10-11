@@ -25,9 +25,19 @@ import (
 // DefaultVersion is the version installed unless the player picks another.
 const DefaultVersion = "1.13c"
 
-// Versions are the versions the launcher offers, newest first. Each is a
-// Lord of Destruction patch legacy-dl's patch source carries.
-var Versions = []string{"1.14d", "1.13d", "1.13c", "1.12a", "1.11b", "1.10", "1.09d"}
+// Versions are the versions the launcher offers, newest first, written as
+// server profiles write game.version. Each is a Lord of Destruction patch
+// legacy-dl's patch source carries.
+var Versions = []string{"1.14d", "1.13d", "1.13c", "1.12a", "1.11b", "1.10f", "1.09d", "1.09b", "1.08"}
+
+// patchVersion is how legacy-dl names a version: after its patch archive,
+// which for 1.10f is LODPatch_110.
+func patchVersion(v string) string {
+	if v == "1.10f" {
+		return "1.10"
+	}
+	return v
+}
 
 // Name is legacy-dl's file name on this platform.
 var Name = "blizzard-legacy-dl" + exeSuffix()
@@ -114,7 +124,7 @@ func (o Options) Check() error {
 // way to take them; they're never written anywhere else by the launcher.
 func args(o Options, game string) []string {
 	a := []string{
-		"install", "D2XP", o.Version,
+		"install", "D2XP", patchVersion(o.Version),
 		"--game", game,
 		"--jobs", "8",
 		// Servers ship Windows binaries, so always the Windows payload,

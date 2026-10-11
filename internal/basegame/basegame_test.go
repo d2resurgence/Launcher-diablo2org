@@ -132,6 +132,11 @@ func TestArgs(t *testing.T) {
 	if slices.Contains(args(o, "x"), "--owner") {
 		t.Error("an empty owner is passed")
 	}
+
+	o.Version = "1.10f"
+	if got := args(o, "x")[2]; got != "1.10" {
+		t.Errorf("1.10f is passed as %q, want legacy-dl's 1.10", got)
+	}
 }
 
 func TestCheck(t *testing.T) {
