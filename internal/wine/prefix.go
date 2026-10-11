@@ -74,7 +74,7 @@ func (p *Prefix) output(ctx context.Context, timeout time.Duration, args ...stri
 	cmd.Stderr = cmd.Stdout
 	err := run(cmd)
 	if ctx.Err() == context.DeadlineExceeded {
-		return buf.String(), fmt.Errorf("wine %s took longer than %s", strings.Join(args, " "), timeout)
+		return buf.String(), fmt.Errorf("wine %s took longer than %s: %w", strings.Join(args, " "), timeout, context.DeadlineExceeded)
 	}
 	return buf.String(), err
 }
@@ -171,13 +171,18 @@ func (p *Prefix) WindowsVersion(ctx context.Context) (string, error) {
 }
 
 // Check32 runs the 32-bit cmd.exe: the game is 32-bit, and some Wine builds,
-// such as a distribution's 64-bit-only package, can't run it.
+// such as a distribution's 64-bit-only package, can't run it. A check cut
+// short, by a timeout or the player cancelling, says nothing either way and
+// isn't ErrNo32Bit.
 func (p *Prefix) Check32(ctx context.Context) error {
 	_, err := p.ver(ctx, `C:\windows\syswow64\cmd.exe`)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrNo32Bit, err)
+	switch {
+	case err == nil:
+		return nil
+	case ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
+		return err
 	}
-	return nil
+	return fmt.Errorf("%w: %w", ErrNo32Bit, err)
 }
 
 // ErrNo32Bit means a Wine can't run 32-bit programs, as the game is.

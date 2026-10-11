@@ -61,13 +61,8 @@ func (s Setup) Run(ctx context.Context, progress func(Progress)) (*Prefix, error
 		case err == nil && s.rejected(rt.Version):
 			// Known not to run 32-bit programs; not tried again.
 		case err == nil:
-			p, err := s.ready(ctx, rt, s.SystemPrefixDir(), report)
-			if err == nil {
+			if p, err := s.trySystem(ctx, rt, report); err == nil {
 				return p, nil
-			}
-			slog.Info("not using the system's Wine", "version", rt.Version, "err", err)
-			if errors.Is(err, ErrNo32Bit) {
-				s.reject(rt.Version)
 			}
 		case !errors.Is(err, ErrNoRuntime):
 			slog.Info("not using the system's Wine", "err", err)
@@ -104,6 +99,20 @@ func (s Setup) Run(ctx context.Context, progress func(Progress)) (*Prefix, error
 // forth.
 func (s Setup) SystemPrefixDir() string {
 	return s.PrefixDir + "-system"
+}
+
+// trySystem sets up the system's Wine rt in its own prefix. A Wine that
+// can't run 32-bit programs is remembered and not tried again; any other
+// failure, such as a timeout, is tried again next time.
+func (s Setup) trySystem(ctx context.Context, rt *Runtime, report func(Progress)) (*Prefix, error) {
+	p, err := s.ready(ctx, rt, s.SystemPrefixDir(), report)
+	if err != nil {
+		slog.Info("not using the system's Wine", "version", rt.Version, "err", err)
+		if errors.Is(err, ErrNo32Bit) {
+			s.reject(rt.Version)
+		}
+	}
+	return p, err
 }
 
 // rejectedFile records a system Wine version that can't run 32-bit
