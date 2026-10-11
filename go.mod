@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	github.com/ulikunitz/xz v0.5.15
 	github.com/wailsapp/wails/v3 v3.0.0-beta.26
 	golang.org/x/sys v0.46.0
 	golang.org/x/text v0.39.0

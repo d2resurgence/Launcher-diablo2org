@@ -98,6 +98,10 @@ func Collect(in Input) []Item {
 		add("logs/"+name, "Launcher log", filepath.Join(logDir, name))
 	}
 	add("logs/"+logs.Crash, "Launcher crashes", filepath.Join(logDir, logs.Crash))
+	for i := 0; i < 4; i++ {
+		name := filepath.Base(logs.Old(logs.Wine, i))
+		add("logs/"+name, "Wine log", filepath.Join(logDir, name))
+	}
 	if in.State != nil {
 		items = append(items, Item{Name: "state.json", What: "Your launcher settings and choices", data: in.State, Size: int64(len(in.State))})
 	} else {
@@ -299,7 +303,7 @@ const minFile = 64 << 10
 
 // Fit writes the items as a zip of at most limit bytes. It first keeps less
 // of the end of each file, down to minFile, then leaves files out: older
-// launcher logs first, then from the end of the list. about.txt, state.json
+// launcher and Wine logs first, then from the end of the list. about.txt, state.json
 // and the current launcher log always stay. It returns the zip and the items
 // it holds.
 func Fit(items []Item, home string, limit int) ([]byte, []Item, error) {
@@ -330,7 +334,9 @@ func Fit(items []Item, home string, limit int) ([]byte, []Item, error) {
 // dropIndex picks the item Fit leaves out next, or -1 if none may go.
 func dropIndex(items []Item) int {
 	for i := len(items) - 1; i >= 0; i-- {
-		if strings.HasPrefix(items[i].Name, "logs/launcher.") && items[i].Name != "logs/"+logs.Current {
+		name := items[i].Name
+		if strings.HasPrefix(name, "logs/launcher.") && name != "logs/"+logs.Current ||
+			strings.HasPrefix(name, "logs/wine.") && name != "logs/"+logs.Wine {
 			return i
 		}
 	}
