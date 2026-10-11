@@ -22,7 +22,11 @@ type BaseInstallRequest struct {
 
 // BaseInstallResult is how an install ended.
 type BaseInstallResult struct {
-	OK        bool   `json:"ok"`
+	OK bool `json:"ok"`
+	// Installed is set once the game is installed, even if something after
+	// that failed: the folder is then an existing install, not one to
+	// install into again.
+	Installed bool   `json:"installed"`
 	Cancelled bool   `json:"cancelled"`
 	Error     string `json:"error"`
 	// Warnings are notes on the keys, such as one that doesn't decode.
@@ -80,7 +84,10 @@ func (s *ServerService) InstallBase(ctx context.Context, req BaseInstallRequest)
 	switch {
 	case err == nil:
 		slog.Info("base game installed", "dir", req.Dir)
-		out.OK = true
+		out.OK, out.Installed = true, true
+	case errors.Is(err, core.ErrBaseNotSaved):
+		logged("install base game", "", err)
+		out.Installed, out.Error = true, err.Error()
 	case errors.Is(err, context.Canceled):
 		slog.Info("base game install cancelled")
 		out.Cancelled = true

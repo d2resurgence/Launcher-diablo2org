@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/user"
 	"strings"
@@ -118,9 +119,19 @@ func (m *Manager) InstallBase(ctx context.Context, o basegame.Options, progress 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Kept even if saving fails: the game is installed, and the next save,
+	// such as finishing the welcome screen, records it.
 	m.state.BasePath = o.BaseDir
-	return res, m.save()
+	if err := m.save(); err != nil {
+		return res, fmt.Errorf("%w: %w", ErrBaseNotSaved, err)
+	}
+	return res, nil
 }
+
+// ErrBaseNotSaved means the game was installed but the launcher couldn't
+// save that it's now the Diablo II folder. Installing again won't help: the
+// folder is no longer empty.
+var ErrBaseNotSaved = errors.New("Diablo II is installed, but the launcher couldn't save where")
 
 // reason says why the base game can't be installed, or "" if it can.
 func (b BaseInstaller) reason() string {

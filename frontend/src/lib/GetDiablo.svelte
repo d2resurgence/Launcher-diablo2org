@@ -95,7 +95,7 @@
       result = await running;
     } catch (err) {
       // Cancelling rejects the call too.
-      result = { ok: false, cancelled, error: cancelled ? "" : errorText(err), warnings: [], cacheBytes: 0 };
+      result = { ok: false, installed: false, cancelled, error: cancelled ? "" : errorText(err), warnings: [], cacheBytes: 0 };
     } finally {
       running = null;
       installing = false;
@@ -107,15 +107,27 @@
     }
     if (!result.ok) {
       failure = result.error;
+      if (result.installed) choice = "existing";
       return;
     }
 
     // The new folder is the Diablo II folder now.
-    app.overview = await ServerService.Overview();
+    try {
+      app.overview = await ServerService.Overview();
+    } catch (err) {
+      // Installed all the same: Back offers it as an existing install.
+      failure = errorText(err);
+      choice = "existing";
+      return;
+    }
     if (firstData) {
       serverState = "active";
-      await firstData.update();
-      serverState = firstData.error || firstData.copyBytes > 0 ? "failed" : "done";
+      try {
+        await firstData.update();
+        serverState = firstData.error || firstData.copyBytes > 0 ? "failed" : "done";
+      } catch {
+        serverState = "failed";
+      }
     }
   }
 
@@ -382,7 +394,10 @@
     {#if installing}
       <button class="title rounded-[3px] border border-edge px-6 py-2 text-[13px] hover:border-muted" onclick={cancel}>Cancel</button>
     {:else if failure}
-      <button class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125" onclick={install}>Try again</button>
+      <!-- Once the game is installed, its folder is no longer one to install into. -->
+      {#if !result?.installed}
+        <button class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125" onclick={install}>Try again</button>
+      {/if}
       <button class="title text-[12px] !text-muted hover:!text-title" onclick={() => (step = "choose")}>Back</button>
     {:else if allDone}
       <button class="title rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50" disabled={finishing} onclick={finish}>
