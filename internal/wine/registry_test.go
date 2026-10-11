@@ -2,6 +2,7 @@ package wine
 
 import (
 	"bytes"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -155,5 +156,22 @@ func TestSetGame(t *testing.T) {
 		if err := r.SetGame(bad, "1.13c"); err == nil {
 			t.Errorf("accepted exe %q", bad)
 		}
+	}
+}
+
+func TestCommitKeepsWritesOnFailure(t *testing.T) {
+	broken := errors.New("no prefix")
+	r := &Registry{Prefix: func() (*Prefix, error) { return nil, broken }}
+	r.loaded = map[string]map[string]regValue{battleNetKey: {}}
+	r.SetGame("Game.exe", "1.13c")
+
+	if err := r.Commit(); !errors.Is(err, broken) {
+		t.Fatalf("Commit = %v", err)
+	}
+	if r.pending[appDefaultsKey+"Game.exe"]["version"].value.sz != "winxp" {
+		t.Error("a failed import dropped the held writes")
+	}
+	if r.loaded != nil {
+		t.Error("a failed import kept what was read")
 	}
 }

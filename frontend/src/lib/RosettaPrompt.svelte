@@ -4,11 +4,13 @@
   // Apple Silicon Macs run the game's Wine through Rosetta 2, which macOS
   // installs only when asked.
   // onReady runs once Rosetta is installed and Wine set up, so the page
-  // that showed the prompt carries on.
-  let { wine, onReady }: { wine: WineSetup; onReady: () => void } = $props();
+  // that showed the prompt carries on; onFailed runs when either fails, with
+  // the reason in wine.error.
+  let { wine, onReady, onFailed }: { wine: WineSetup; onReady: () => void; onFailed?: () => void } = $props();
 
   async function install() {
     if (await wine.installRosetta()) onReady();
+    else onFailed?.();
   }
 </script>
 

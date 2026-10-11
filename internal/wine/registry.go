@@ -134,24 +134,28 @@ func (r *Registry) set(key, name string, v regValue) {
 }
 
 // Commit imports the held writes, then forgets what was read, so the next
-// launch reads afresh: the game may change the values while it runs.
+// launch reads afresh: the game may change the values while it runs. Writes
+// that fail to import are kept for the next Commit.
 func (r *Registry) Commit() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	pending := r.pending
-	r.pending, r.loaded = nil, nil
-	if len(pending) == 0 {
+	r.loaded = nil
+	if len(r.pending) == 0 {
 		return nil
 	}
 
 	keys := map[string][]namedValue{}
-	for key, values := range pending {
+	for key, values := range r.pending {
 		for _, v := range values {
 			keys[key] = append(keys[key], v)
 		}
 	}
-	return r.importReg(encodeReg(keys))
+	if err := r.importReg(encodeReg(keys)); err != nil {
+		return err
+	}
+	r.pending = nil
+	return nil
 }
 
 // load creates the keys if need be, then exports both.

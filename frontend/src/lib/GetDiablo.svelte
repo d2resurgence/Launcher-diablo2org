@@ -61,7 +61,7 @@
       owner = s.owner;
       // 1.13c unless every server picked is a 1.14 one.
       const versions = picked.map((p) => p.profile?.game.version ?? "");
-      version = versions.length && versions.every((v) => family(v) === "1.14") && s.versions.includes("1.14d") ? "1.14d" : s.defaultVersion;
+      version = versions.length && versions.every((v) => family(v) === "1.14") && (s.versions ?? []).includes("1.14d") ? "1.14d" : s.defaultVersion;
       // A game the launcher found, or one it can't install: use what's there.
       if (app.baseReady || !s.available) choice = "existing";
     });
@@ -385,7 +385,7 @@
   <StepList {rows} />
   {#if wineSetup.needsRosetta}
     <!-- install skips Wine, now set up, and carries on with the download. -->
-    <RosettaPrompt wine={wineSetup} onReady={install} />
+    <RosettaPrompt wine={wineSetup} onReady={install} onFailed={() => (failure = wineSetup.error || "Wine couldn't be set up.")} />
   {/if}
 
   {#if failure}

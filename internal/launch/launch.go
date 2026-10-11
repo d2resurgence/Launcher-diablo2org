@@ -224,7 +224,7 @@ func (l *Launcher) Launch(ctx context.Context, base, serverDir string, p *spec.P
 	}
 	if c, ok := l.registry.(Committer); ok {
 		if err := c.Commit(); err != nil {
-			return fmt.Errorf("setting up Battle.net: %w", err)
+			return fmt.Errorf("saving the game's settings: %w", err)
 		}
 	}
 
