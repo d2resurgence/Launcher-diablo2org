@@ -26,7 +26,7 @@
     <StepList rows={wine.rows} />
 
     {#if wine.needsRosetta}
-      <RosettaPrompt {wine} />
+      <RosettaPrompt {wine} onReady={() => app.wineReady()} />
     {/if}
     {#if wine.error}
       <p class="mt-4 max-w-xl whitespace-pre-line text-[12px] text-bad">{wine.error}</p>

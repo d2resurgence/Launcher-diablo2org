@@ -3,7 +3,13 @@
 
   // Apple Silicon Macs run the game's Wine through Rosetta 2, which macOS
   // installs only when asked.
-  let { wine }: { wine: WineSetup } = $props();
+  // onReady runs once Rosetta is installed and Wine set up, so the page
+  // that showed the prompt carries on.
+  let { wine, onReady }: { wine: WineSetup; onReady: () => void } = $props();
+
+  async function install() {
+    if (await wine.installRosetta()) onReady();
+  }
 </script>
 
 <section class="mt-6 max-w-xl rounded border border-line bg-panel/90 p-5">
@@ -15,7 +21,7 @@
   <button
     class="title mt-4 rounded-[3px] bg-accent px-6 py-2 text-[13px] !text-white hover:brightness-125 disabled:opacity-50"
     disabled={wine.installingRosetta}
-    onclick={() => wine.installRosetta()}
+    onclick={install}
   >
     {wine.installingRosetta ? "Installing Rosetta…" : "Install Rosetta"}
   </button>

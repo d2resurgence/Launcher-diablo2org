@@ -384,7 +384,8 @@
 
   <StepList {rows} />
   {#if wineSetup.needsRosetta}
-    <RosettaPrompt wine={wineSetup} />
+    <!-- install skips Wine, now set up, and carries on with the download. -->
+    <RosettaPrompt wine={wineSetup} onReady={install} />
   {/if}
 
   {#if failure}

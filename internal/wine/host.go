@@ -41,19 +41,23 @@ func (h *Host) Prefix() (*Prefix, error) {
 }
 
 // Ready reports whether the game can start now, checking for a prefix an
-// earlier run set up. It doesn't download or create anything.
+// earlier run set up. It doesn't download or create anything. The check
+// runs Wine, so it's done without the lock, which launches need.
 func (h *Host) Ready(ctx context.Context) bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if h.prefix != nil {
+	if _, err := h.Prefix(); err == nil {
 		return true
 	}
+
 	p, err := h.Setup.Quick(ctx)
 	if err != nil {
 		return false
 	}
-	h.prefix = p
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.prefix == nil {
+		h.prefix = p
+	}
 	return true
 }
 
