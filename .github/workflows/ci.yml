@@ -139,17 +139,217 @@ jobs:
             bin/*-installer.exe
           if-no-files-found: error
 
+  macos:
+    runs-on: macos-latest
+    env:
+      # Tagged releases are signed with the Developer ID certificate and
+      # notarized; see build/darwin/sign.sh. As on Windows, the secrets only
+      # reach the steps that sign, and a fork's tags build unsigned.
+      SIGN: ${{ github.ref_type == 'tag' && github.repository == 'diablo2org/launcher' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+
+      - name: Go tests
+        run: go test ./internal/... ./build/...
+
+      - name: Go vet
+        run: go vet ./internal/... ./cmd/... ./build/...
+
+      - name: Frontend install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend type-check
+        run: |
+          wails3 generate bindings -clean=true -ts
+          cd frontend
+          npm run check
+
+      # A universal app (arm64 and amd64) with a universal blizzard-legacy-dl
+      # inside. The tag reaches the build as an environment variable, never
+      # as script text; the Taskfile only uses a SemVer tag.
+      - name: Build app
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version=""
+          if [ "$REF_TYPE" = "tag" ]; then version="$REF_NAME"; fi
+          wails3 task darwin:package:universal VERSION="$version"
+          if [ -n "$version" ]; then
+            numeric=$(printf '%s' "${version#v}" | sed -E 's/[-+].*$//')
+            plutil -replace CFBundleShortVersionString -string "$numeric" bin/launcher.app/Contents/Info.plist
+            plutil -replace CFBundleVersion -string "$numeric" bin/launcher.app/Contents/Info.plist
+          fi
+          lipo -info bin/launcher.app/Contents/MacOS/launcher
+          lipo -info bin/launcher.app/Contents/Resources/bin/blizzard-legacy-dl
+
+      - name: Sign app
+        if: env.SIGN == 'true'
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: build/darwin/sign.sh app bin/launcher.app
+
+      - name: Build DMG
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version=""
+          if [ "$REF_TYPE" = "tag" ]; then version="$REF_NAME"; fi
+          # The tag names the release file, which the update check matches
+          # by name in the release's download URL: only a plain SemVer tag.
+          if [ -n "$version" ] && ! printf '%s' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "tag $version isn't a release tag such as v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
+          wails3 task darwin:create:dmg
+          name="launcher-${version:-dev}-universal.dmg"
+          mv bin/launcher.dmg "bin/$name"
+          ls -l bin/*.dmg
+
+      - name: Sign and notarize DMG
+        if: env.SIGN == 'true'
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: build/darwin/sign.sh dmg bin/launcher-*-universal.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-macos
+          path: bin/launcher-*-universal.dmg
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # GTK 4 and WebKitGTK 6.0, which the Linux build links against, and
+      # FUSE for running the AppImage tooling.
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libfuse2t64 file
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+
+      - name: Go tests
+        run: go test ./internal/... ./build/...
+
+      - name: Go vet
+        run: go vet ./internal/... ./cmd/... ./build/...
+
+      - name: Frontend install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend type-check
+        run: |
+          wails3 generate bindings -clean=true -ts
+          cd frontend
+          npm run check
+
+      # The AppImage is the main Linux download, with blizzard-legacy-dl
+      # inside; deb and rpm are built from the same binary.
+      - name: Build packages
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version=""
+          if [ "$REF_TYPE" = "tag" ]; then version="$REF_NAME"; fi
+          # The tag names the release file, which the update check matches
+          # by name in the release's download URL: only a plain SemVer tag.
+          if [ -n "$version" ] && ! printf '%s' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "tag $version isn't a release tag such as v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
+          if [ -n "$version" ]; then
+            numeric=$(printf '%s' "${version#v}" | sed -E 's/[-+].*$//')
+            sed -i -E "s/^version: .*/version: \"$numeric\"/" build/linux/nfpm/nfpm.yaml
+          fi
+          wails3 task linux:build VERSION="$version"
+          wails3 task linux:create:appimage VERSION="$version"
+          wails3 task linux:create:deb VERSION="$version"
+          wails3 task linux:create:rpm VERSION="$version"
+          name="${version:-dev}"
+          mv bin/launcher-x86_64.AppImage "bin/launcher-${name}-x86_64.AppImage"
+          ls -l bin
+
+      # The AppImage starts, and holds blizzard-legacy-dl beside the launcher.
+      - name: Check AppImage
+        run: |
+          image=$(ls bin/launcher-*-x86_64.AppImage)
+          cd "$(mktemp -d)"
+          "$GITHUB_WORKSPACE/$image" --appimage-extract >/dev/null
+          test -x squashfs-root/usr/bin/launcher
+          test -x squashfs-root/usr/bin/blizzard-legacy-dl
+          file squashfs-root/usr/bin/blizzard-legacy-dl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux
+          path: |
+            bin/launcher-*-x86_64.AppImage
+            bin/*.deb
+            bin/*.rpm
+          if-no-files-found: error
+
   release:
     if: github.ref_type == 'tag'
-    needs: windows
+    needs: [windows, macos, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: launcher-windows
           path: dist
+
+      # One checksums file for every release file, so each package can be
+      # checked the same way, and the launcher finds its installer's hash.
+      - name: Checksums
+        run: |
+          cd dist
+          find . -type f \( -name '*-installer.exe' -o -name 'd2pack.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
+            -exec sha256sum {} + | sed -E 's#  .*/#  #' | sort -k2 > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       # A tag with a suffix, such as v1.2.3-rc.1, is a pre-release: the
       # launcher's update check skips those, so test builds never reach
@@ -160,5 +360,9 @@ jobs:
           files: |
             dist/**/*-installer.exe
             dist/**/d2pack.exe
-            dist/**/SHA256SUMS.txt
+            dist/**/launcher-*-universal.dmg
+            dist/**/launcher-*-x86_64.AppImage
+            dist/**/*.deb
+            dist/**/*.rpm
+            dist/SHA256SUMS.txt
           generate_release_notes: true

@@ -54,12 +54,17 @@ tasks:
       - task: common:generate:icons
       - task: generate:dotdesktop
     preconditions:
+      - sh: '{{if and .VERSION (not .SAFE_VERSION)}}exit 1{{else}}exit 0{{end}}'
+        msg: "VERSION must be a release tag such as v1.2.3 or v1.2.3-beta.1"
       - sh: '{{if eq .OBFUSCATED "true"}}command -v garble >/dev/null 2>&1{{else}}true{{end}}'
         msg: "garble is required for obfuscated builds. Install it with: go install mvdan.cc/garble@v0.16.0 (requires Go 1.24+). See https://github.com/burrowers/garble/releases for version/toolchain compatibility."
     cmds:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o {{.OUTPUT}}'
     vars:
-      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s"{{end}}'
+      # VERSION comes from the release tag; only a SemVer tag is used, as
+      # build/windows/Taskfile.yml explains.
+      SAFE_VERSION: '{{if .VERSION}}{{if regexMatch `^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$` .VERSION}}{{.VERSION}}{{end}}{{end}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s{{if .SAFE_VERSION}} -X github.com/diablo2org/launcher/internal/app.Version={{.SAFE_VERSION}}{{end}}"{{end}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:
@@ -119,12 +124,46 @@ tasks:
       - cp "{{.APP_BINARY}}" "{{.APP_NAME}}"
       - cp ../../appicon.png "{{.APP_NAME}}.png"
       - wails3 generate appimage -binary "{{.APP_NAME}}" -icon {{.ICON}} -desktopfile {{.DESKTOP_FILE}} -outputdir {{.OUTPUT_DIR}} -builddir {{.ROOT_DIR}}/build/linux/appimage/build
+      - task: bundle:appimage:legacy-dl
     vars:
       APP_NAME: '{{.APP_NAME}}'
       APP_BINARY: '../../../bin/{{.APP_NAME}}'
       ICON: '{{.APP_NAME}}.png'
       DESKTOP_FILE: '../{{.APP_NAME}}.desktop'
       OUTPUT_DIR: '../../../bin'
+
+  bundle:appimage:legacy-dl:
+    summary: Adds blizzard-legacy-dl, which installs the base game, beside the launcher in the AppImage
+    desc: |
+      wails3 generate appimage packs only the launcher, so the AppImage is
+      unpacked, legacy-dl and its licence added to usr/bin, and packed again
+      with a pinned appimagetool.
+    internal: true
+    deps:
+      - task: common:fetch:legacy-dl
+        vars:
+          TARGET_OS: linux
+          TARGET_ARCH: amd64
+    dir: build/linux/appimage/build
+    cmds:
+      - |
+        set -euo pipefail
+        image="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}-x86_64.AppImage"
+        tool=appimagetool-{{.APPIMAGETOOL_VERSION}}-x86_64.AppImage
+        if [ ! -f "$tool" ] || ! echo "{{.APPIMAGETOOL_SHA256}}  $tool" | sha256sum -c --status; then
+          curl -fsSL -o "$tool" "https://github.com/AppImage/appimagetool/releases/download/{{.APPIMAGETOOL_VERSION}}/appimagetool-x86_64.AppImage"
+          echo "{{.APPIMAGETOOL_SHA256}}  $tool" | sha256sum -c -
+        fi
+        chmod +x "$tool"
+        rm -rf squashfs-root
+        "$image" --appimage-extract >/dev/null
+        install -m 755 "{{.ROOT_DIR}}/{{.BIN_DIR}}/legacy-dl/linux-amd64/blizzard-legacy-dl" squashfs-root/usr/bin/blizzard-legacy-dl
+        install -D -m 644 "{{.ROOT_DIR}}/{{.BIN_DIR}}/legacy-dl/LICENSE.txt" squashfs-root/usr/share/doc/launcher/blizzard-legacy-dl-LICENSE.txt
+        ARCH=x86_64 "./$tool" --appimage-extract-and-run --no-appstream squashfs-root "$image"
+        rm -rf squashfs-root
+    vars:
+      APPIMAGETOOL_VERSION: 1.9.1
+      APPIMAGETOOL_SHA256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
 
   create:deb:
     summary: Creates a deb package

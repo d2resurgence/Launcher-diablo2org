@@ -156,6 +156,16 @@
             Update to {app.update.version}
           </button>
           <button class="title !text-muted hover:!text-title" title="What's new" aria-label="What's new" onclick={() => Browser.OpenURL(app.update!.url)}>↗</button>
+        {:else if app.update.download}
+          <!-- macOS and Linux: the new package downloads in the browser, to install as the first. -->
+          <button
+            class="title !text-date hover:!text-title"
+            title={`Downloads ${app.update.version} in your browser. Install it as you did this one.`}
+            onclick={() => Browser.OpenURL(app.update!.download)}
+          >
+            Download {app.update.version}
+          </button>
+          <button class="title !text-muted hover:!text-title" title="What's new" aria-label="What's new" onclick={() => Browser.OpenURL(app.update!.url)}>↗</button>
         {:else}
           <button
             class="title !text-date hover:!text-title"

@@ -104,7 +104,16 @@ func sha(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// onWindows has the update check behave as on Windows, where the launcher
+// updates itself in place.
+func onWindows(t *testing.T) {
+	old := hostOS
+	hostOS = "windows"
+	t.Cleanup(func() { hostOS = old })
+}
+
 func TestCheckFindsInstaller(t *testing.T) {
+	onWindows(t)
 	ctx := context.Background()
 	body := "new installer"
 	name := "launcher-" + runtime.GOARCH + "-installer.exe"
@@ -135,6 +144,7 @@ func TestCheckFindsInstaller(t *testing.T) {
 }
 
 func TestCheckIgnoresInstallersElsewhere(t *testing.T) {
+	onWindows(t)
 	c, latest := releaseServer(t, "x", "sha256:"+sha("x"), "")
 	downloadPrefix = "https://github.com/diablo2org/launcher/releases/download/"
 
@@ -145,6 +155,7 @@ func TestCheckIgnoresInstallersElsewhere(t *testing.T) {
 }
 
 func TestDownload(t *testing.T) {
+	onWindows(t)
 	ctx := context.Background()
 	body := "new installer"
 	c, latest := releaseServer(t, body, "sha256:"+sha(body), "")
@@ -175,5 +186,56 @@ func TestDownload(t *testing.T) {
 	bad.Name = `..\launcher-installer.exe`
 	if _, err := Download(ctx, c, &bad, t.TempDir(), nil); err == nil {
 		t.Error("installer name with a path accepted")
+	}
+}
+
+func TestPackageURL(t *testing.T) {
+	old := downloadPrefix
+	defer func() { downloadPrefix = old }()
+	downloadPrefix = "https://github.com/diablo2org/launcher/releases/download/"
+	base := downloadPrefix + "v1.2.0/"
+	assets := []asset{
+		{Name: "launcher-v1.1.0-x86_64.AppImage", DownloadURL: base + "launcher-v1.1.0-x86_64.AppImage"},
+		{Name: "launcher-amd64-installer.exe", DownloadURL: base + "launcher-amd64-installer.exe"},
+		{Name: "launcher-v1.2.0-universal.dmg", DownloadURL: base + "launcher-v1.2.0-universal.dmg"},
+		{Name: "launcher-v1.2.0-x86_64.AppImage", DownloadURL: base + "launcher-v1.2.0-x86_64.AppImage"},
+		{Name: "launcher-v1.2.0-arm64.dmg", DownloadURL: "https://example.com/launcher-v1.2.0-arm64.dmg"},
+		// An older package left in the release comes first; it's never offered.
+		{Name: "launcher-v1.1.0-universal.dmg", DownloadURL: base + "launcher-v1.1.0-universal.dmg"},
+	}
+
+	tests := []struct{ goos, goarch, want string }{
+		{"darwin", "arm64", base + "launcher-v1.2.0-universal.dmg"},
+		{"darwin", "amd64", base + "launcher-v1.2.0-universal.dmg"},
+		{"linux", "amd64", base + "launcher-v1.2.0-x86_64.AppImage"},
+		{"linux", "arm64", ""},
+		{"windows", "amd64", ""},
+	}
+	for _, tt := range tests {
+		if got := packageURL("v1.2.0", assets, tt.goos, tt.goarch); got != tt.want {
+			t.Errorf("%s/%s: %q, want %q", tt.goos, tt.goarch, got, tt.want)
+		}
+	}
+
+	// A package published anywhere else isn't offered.
+	elsewhere := []asset{{Name: "launcher-v1.2.0-universal.dmg", DownloadURL: "https://example.com/launcher-v1.2.0-universal.dmg"}}
+	if got := packageURL("v1.2.0", elsewhere, "darwin", "arm64"); got != "" {
+		t.Errorf("offered a package from elsewhere: %q", got)
+	}
+}
+
+func TestCheckOffersPackageOffWindows(t *testing.T) {
+	old := hostOS
+	hostOS = "linux"
+	defer func() { hostOS = old }()
+
+	// A release with a valid Windows installer: off Windows it isn't used.
+	c, latest := releaseServer(t, "new installer", "sha256:"+sha("new installer"), "")
+	r, err := Check(context.Background(), c, latest, "v0.1.0")
+	if err != nil || r == nil {
+		t.Fatalf("Check = %+v, %v", r, err)
+	}
+	if r.Installer != nil {
+		t.Errorf("a Windows installer was offered on Linux: %+v", r.Installer)
 	}
 }

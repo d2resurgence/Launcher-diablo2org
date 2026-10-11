@@ -26,6 +26,10 @@ type Release struct {
 	// Installer is nil when the release has no installer for this machine
 	// with a known hash; then the player is sent to the release page.
 	Installer *Installer `json:"installer"`
+	// Download is the package for this system that the player downloads
+	// and installs themselves, where the launcher doesn't update itself
+	// yet: the .dmg on macOS, the AppImage on Linux. "" if there's none.
+	Download string `json:"download"`
 }
 
 // Installer is a release's installer, with what it must match once
@@ -96,9 +100,47 @@ func Check(ctx context.Context, c *fetch.Client, latestURL, current string) (*Re
 
 	// Without an installer there's still the release page, so a problem
 	// finding one isn't an error.
-	rel.Installer, _ = installer(ctx, c, r.TagName, r.Assets)
+	// Only Windows updates in place; elsewhere a Windows installer would
+	// hide the package for this system.
+	if hostOS == "windows" {
+		rel.Installer, _ = installer(ctx, c, r.TagName, r.Assets)
+	}
+	rel.Download = packageURL(r.TagName, r.Assets, hostOS, runtime.GOARCH)
 
 	return rel, nil
+}
+
+// hostOS is the system updates are for; tests change it.
+var hostOS = runtime.GOOS
+
+// packageSuffix ends the name CI gives each system's package, as in
+// launcher-v1.2.3-universal.dmg. Windows has its installer instead.
+func packageSuffix(goos, goarch string) string {
+	switch {
+	case goos == "darwin":
+		return "-universal.dmg"
+	case goos == "linux" && goarch == "amd64":
+		return "-x86_64.AppImage"
+	}
+	return ""
+}
+
+// packageURL is the download of this system's package in a release, or "".
+func packageURL(tag string, assets []asset, goos, goarch string) string {
+	suffix := packageSuffix(goos, goarch)
+	if suffix == "" {
+		return ""
+	}
+	// Exactly this release's package, so an older one left in the release
+	// is never offered.
+	name := "launcher-" + tag + suffix
+	base := downloadPrefix + tag + "/"
+	for _, a := range assets {
+		if a.Name == name && a.DownloadURL == base+name {
+			return a.DownloadURL
+		}
+	}
+	return ""
 }
 
 type asset struct {

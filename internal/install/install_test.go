@@ -3,6 +3,7 @@ package install
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -98,6 +99,9 @@ func TestCopyArchives(t *testing.T) {
 }
 
 func TestWarning(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Program Files paths are Windows paths")
+	}
 	t.Setenv("ProgramFiles", `C:\Program Files`)
 	t.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
 

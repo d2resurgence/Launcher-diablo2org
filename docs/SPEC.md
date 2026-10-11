@@ -56,14 +56,43 @@ Every server gets its own folder under the player's Diablo II install:
   server folders inside it.
 - Each server ships a **complete executable set** for its game version
   (`Game.exe`, every `D2*.dll`, `Storm.dll`, `Fog.dll`, `patch_d2.mpq`, ...),
-  so any retail version works as the base. The launcher does not detect or
-  convert the base version.
+  so any retail version works as the base. The launcher does not convert
+  the base version; the one archive a pre-1.14 server can't read from a 1.14
+  base gets a corrected copy (section 2.2).
 - The base archives (`d2char`, `d2data`, `d2exp`, `d2music`, `d2sfx`,
   `d2speech`, `d2video`, `d2xmusic`, `d2xtalk`, `d2xvideo`) are **never**
   hosted by a server or the launcher. Their presence in the base folder is
   the ownership check.
+- The layout is the same on Windows, macOS and Linux. On macOS and Linux the
+  game runs under Wine (section 7.1).
 
-### 2.1 Finding the base archives
+### 2.1 Getting the base game
+
+On first run the player picks servers, then gets Diablo II one of two ways:
+
+- **Install Diablo II for me** (the default). The launcher runs the
+  [blizzard-legacy-dl](https://github.com/jaenster/blizzard-legacy-dl) it
+  ships with, which downloads Diablo II and Lord of Destruction from
+  Blizzard's own CDN (about 2 GB) and builds the game folder without
+  Blizzard's installer. Older versions are reached with the patches
+  legacy-dl fetches from its patch source. The version is 1.13c unless every
+  server picked is a 1.14 one; an Advanced setting offers the others, with a
+  warning when a picked server needs the other family (pre-1.14 or 1.14).
+  The player enters the CD keys from their own copies, which are stored only
+  inside the game's own archives, as Blizzard's installer stores them. Keys
+  are tidied (spaces and hyphens removed, upper case) but not checked: nobody
+  can check ownership any more. The launcher never fills in, generates,
+  ships or logs a key, and takes them out of anything it writes down.
+  legacy-dl takes the keys on its command line, so while the install runs
+  other programs of the same user can see them in the process list; it
+  offers no other way. It
+  installs only into an empty or new folder, by default
+  `<app data>\Diablo II` (section 10).
+- **I already have Diablo II installed**: the launcher checks the folder the
+  game last recorded (Windows), or one the player chooses, for the base
+  archives.
+
+### 2.2 Finding the base archives
 
 The game only looks for archives in its working folder and its own folder,
 never the parent. A profile declares how its game finds them with
@@ -72,7 +101,7 @@ never the parent. A profile declares how its game finds them with
 | Value | Meaning |
 |---|---|
 | `parent` | The server's own game code redirects archive loading to `..\` (as Project Diablo 2 and Path of Diablo do). The launcher does nothing extra. |
-| `link` | The launcher places the base archives in the server folder as **hard links**. This needs no admin rights and no extra disk space, but only works when the server folder is on the same NTFS volume as the base install. Otherwise the launcher offers to copy them, stating the size first. |
+| `link` | The launcher places the base archives in the server folder as **hard links**. This needs no admin rights and no extra disk space, but only works when the server folder is on the same volume as the base install (NTFS, APFS, ext4, btrfs and so on). Otherwise the launcher offers to copy them, stating the size first. |
 
 Tested on 1.13c with SlashDiablo's files: started from a server folder
 holding hard links to all ten base archives, the game reaches the main menu
@@ -546,6 +575,25 @@ The launcher starts the game like this:
 
 The launcher does not need, and does not request, administrator rights.
 
+### 7.1 macOS and Linux
+
+The game runs under Wine, in a prefix of the launcher's own (section 10):
+
+- **Runtime.** On macOS, WineHQ's macOS build of Wine, downloaded on first
+  run (about 185 MB) and pinned by version and SHA-256; on Apple silicon it
+  runs through Rosetta 2, which the launcher offers to install. On Linux, the
+  system's Wine when it is 9.0 or later and runs 32-bit programs, otherwise a
+  pinned amd64 build. Play opens a setup page when Wine isn't ready.
+- **Starting a box.** `wine <exe> <flags>` from the server folder, with
+  `WINEDEBUG=-all` and `WINEDLLOVERRIDES=mscoree,mshtml=`.
+- **Renderer.** A `d2gl` component is on by default where the player hasn't
+  chosen. In DirectDraw mode it gets `ddraw=n,b`; in Glide mode (`-3dfx`) the
+  game loads its `glide3x.dll` itself. With no d2gl on, the game runs
+  windowed (`-w`), as full screen under Wine can change the display mode.
+- **Windows version.** For a `game.version` older than 1.14, Wine reports
+  Windows XP to the exe: on Apple silicon, 1.13c's `Fog.dll` overflows its
+  stack at start-up under Wine's default Windows 10.
+
 ## 8. Registry
 
 Diablo II reads its Battle.net settings from the current user's registry.
@@ -557,6 +605,13 @@ These are the only values the launcher writes:
 | `HKCU\Software\Blizzard Entertainment\Diablo II` | `BNETIP` | `REG_SZ` | The first gateway's host. Not with `launch.setGateways: false` |
 | `HKCU\Software\Blizzard Entertainment\Diablo II` | `Preferred Realm` | `REG_SZ` | The first gateway's `realm`, when set. Not with `launch.setGateways: false` |
 | `HKCU\Software\Blizzard Entertainment\Diablo II` | `Save Path` | `REG_SZ` | `<server folder>\Save\` with `game.saves: isolated`; otherwise `<base>\Save\`, only when needed (below) |
+
+On macOS and Linux these values are written in the launcher's Wine prefix
+(section 7.1), never by editing its `.reg` files, and `Save Path` is the
+folder as Windows programs see it there, on drive `Z:` (for example
+`Z:\Users\<name>\Library\Application Support\diablo2org\Diablo II\Save\`). The
+launcher also sets `HKCU\Software\Wine\AppDefaults\<exe>` `Version` in the
+prefix: `winxp` for a game older than 1.14, removed otherwise.
 
 An isolated server writes `Save Path` on every launch. A shared server writes
 `<base>\Save\` only when `Save Path` is unset or still holds an isolated
@@ -632,7 +687,15 @@ Not part of the server contract, recorded here so server staff know what the
 launcher keeps:
 
 - `%LOCALAPPDATA%\<launcher>\` holds launcher settings, the listing and
-  manifest caches, cached images and logs.
+  manifest caches, cached images and logs (`launcher.log`, and `wine.log` on
+  macOS and Linux).
+- The app data folder holds what the launcher installs: `Diablo II\` (a base
+  game it installed), `cache\legacy-dl\` (its download, which the player
+  can delete), and on macOS and Linux `runtime\wine\<version>\` and
+  `prefix\` (the Wine prefix; `prefix-system\` with the system's Wine). It
+  is `%LOCALAPPDATA%\diablo2org` on Windows,
+  `~/Library/Application Support/diablo2org` on macOS and
+  `$XDG_DATA_HOME/diablo2org` on Linux.
 - Per server it stores: the chosen channel, component versions, flag
   settings, instance count and d2gl box profiles.
 - It stores nothing inside the base install, and nothing inside the server
@@ -643,6 +706,5 @@ launcher keeps:
 1. Loot filters: PD2 offers filters from several authors. Worth a `filters`
    section so any server can offer the same?
 2. Self-update and code signing for the launcher itself: out of scope for
-   this document.
-3. Linux: a Flatpak build that runs the game through Wine needs the registry
-   writes to go into the Wine prefix instead.
+   this document. (Windows updates in place; on macOS and Linux an update
+   opens the new package's download.)
