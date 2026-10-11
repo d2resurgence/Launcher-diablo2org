@@ -82,11 +82,15 @@ On first run the player picks servers, then gets Diablo II one of two ways:
   inside the game's own archives, as Blizzard's installer stores them. Keys
   are tidied (spaces and hyphens removed, upper case) but not checked: nobody
   can check ownership any more. The launcher never fills in, generates,
-  ships or logs a key, and takes them out of anything it writes down. It
+  ships or logs a key, and takes them out of anything it writes down.
+  legacy-dl takes the keys on its command line, so while the install runs
+  other programs of the same user can see them in the process list; it
+  offers no other way. It
   installs only into an empty or new folder, by default
   `<app data>\Diablo II` (section 10).
-- **I already have Diablo II installed**: the folder the game last recorded
-  (Windows), or one the player chooses, checked for the base archives.
+- **I already have Diablo II installed**: the launcher checks the folder the
+  game last recorded (Windows), or one the player chooses, for the base
+  archives.
 
 ### 2.2 Finding the base archives
 

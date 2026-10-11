@@ -100,11 +100,18 @@ func Check(ctx context.Context, c *fetch.Client, latestURL, current string) (*Re
 
 	// Without an installer there's still the release page, so a problem
 	// finding one isn't an error.
-	rel.Installer, _ = installer(ctx, c, r.TagName, r.Assets)
-	rel.Download = packageURL(r.TagName, r.Assets, runtime.GOOS, runtime.GOARCH)
+	// Only Windows updates in place; elsewhere a Windows installer would
+	// hide the package for this system.
+	if hostOS == "windows" {
+		rel.Installer, _ = installer(ctx, c, r.TagName, r.Assets)
+	}
+	rel.Download = packageURL(r.TagName, r.Assets, hostOS, runtime.GOARCH)
 
 	return rel, nil
 }
+
+// hostOS is the system updates are for; tests change it.
+var hostOS = runtime.GOOS
 
 // packageSuffix ends the name CI gives each system's package, as in
 // launcher-v1.2.3-universal.dmg. Windows has its installer instead.
@@ -124,10 +131,12 @@ func packageURL(tag string, assets []asset, goos, goarch string) string {
 	if suffix == "" {
 		return ""
 	}
+	// Exactly this release's package, so an older one left in the release
+	// is never offered.
+	name := "launcher-" + tag + suffix
 	base := downloadPrefix + tag + "/"
 	for _, a := range assets {
-		if a.DownloadURL == base+a.Name && strings.HasPrefix(a.Name, "launcher-") &&
-			strings.HasSuffix(a.Name, suffix) && !strings.ContainsAny(a.Name, `/\`) {
+		if a.Name == name && a.DownloadURL == base+name {
 			return a.DownloadURL
 		}
 	}

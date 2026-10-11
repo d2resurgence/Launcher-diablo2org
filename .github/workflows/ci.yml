@@ -211,9 +211,16 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          version=""
+          if [ "$REF_TYPE" = "tag" ]; then version="$REF_NAME"; fi
+          # The tag names the release file, which the update check matches
+          # by name in the release's download URL: only a plain SemVer tag.
+          if [ -n "$version" ] && ! printf '%s' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "tag $version isn't a release tag such as v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
           wails3 task darwin:create:dmg
-          name="launcher-dev-universal.dmg"
-          if [ "$REF_TYPE" = "tag" ]; then name="launcher-${REF_NAME}-universal.dmg"; fi
+          name="launcher-${version:-dev}-universal.dmg"
           mv bin/launcher.dmg "bin/$name"
           ls -l bin/*.dmg
 
@@ -287,6 +294,12 @@ jobs:
         run: |
           version=""
           if [ "$REF_TYPE" = "tag" ]; then version="$REF_NAME"; fi
+          # The tag names the release file, which the update check matches
+          # by name in the release's download URL: only a plain SemVer tag.
+          if [ -n "$version" ] && ! printf '%s' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "tag $version isn't a release tag such as v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
           if [ -n "$version" ]; then
             numeric=$(printf '%s' "${version#v}" | sed -E 's/[-+].*$//')
             sed -i -E "s/^version: .*/version: \"$numeric\"/" build/linux/nfpm/nfpm.yaml
