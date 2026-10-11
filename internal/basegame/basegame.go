@@ -50,7 +50,8 @@ func exeSuffix() string {
 }
 
 // Find looks for legacy-dl where the packages put it: beside the launcher
-// on Windows and Linux, in Contents/Resources/bin in the macOS app.
+// on Windows and Linux, in Contents/Resources/bin in the macOS app. A
+// development build finds the copy common:fetch:legacy-dl put in bin.
 func Find() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -64,6 +65,7 @@ func Find() (string, error) {
 	for _, p := range []string{
 		filepath.Join(dir, Name),
 		filepath.Join(dir, "..", "Resources", "bin", Name),
+		filepath.Join(dir, "legacy-dl", runtime.GOOS+"-"+runtime.GOARCH, Name),
 	} {
 		if info, err := os.Stat(p); err == nil && info.Mode().IsRegular() {
 			return p, nil

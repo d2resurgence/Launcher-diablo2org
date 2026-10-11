@@ -19,6 +19,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/diablo2org/launcher/internal/app"
+	"github.com/diablo2org/launcher/internal/basegame"
 	"github.com/diablo2org/launcher/internal/core"
 	"github.com/diablo2org/launcher/internal/fetch"
 	"github.com/diablo2org/launcher/internal/launch"
@@ -61,6 +62,7 @@ const (
 func init() {
 	application.RegisterEvent[app.UpdateProgress]("update:progress")
 	application.RegisterEvent[app.LauncherUpdateProgress]("launcher:update")
+	application.RegisterEvent[basegame.Progress]("base:progress")
 }
 
 func main() {
@@ -106,6 +108,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	manager.SetBaseInstaller(baseInstaller(dataDir))
 
 	var a *application.App
 	var window *application.WebviewWindow
@@ -258,4 +262,30 @@ func windowsOptions() application.WindowsOptions {
 	}
 
 	return o
+}
+
+// baseInstaller installs the base game into the launcher's app data folder,
+// or a test run's data folder, with the legacy-dl that ships beside it.
+func baseInstaller(dataDir string) core.BaseInstaller {
+	root := dataDir
+	if os.Getenv(envData) == "" {
+		dir, err := store.AppDataDir()
+		if err != nil {
+			return core.BaseInstaller{Unavailable: err.Error()}
+		}
+		root = dir
+	}
+
+	b := core.BaseInstaller{
+		Installer:  basegame.Installer{CacheDir: filepath.Join(root, "cache", "legacy-dl")},
+		DefaultDir: filepath.Join(root, "Diablo II"),
+	}
+	exe, err := basegame.Find()
+	if err != nil {
+		slog.Warn("base game installs unavailable", "err", err)
+		b.Unavailable = err.Error()
+	}
+	b.Exe = exe
+
+	return b
 }

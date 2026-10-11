@@ -42,6 +42,9 @@ type Manager struct {
 	loaded bool
 	// busy stops updates and verification of the same server running at once.
 	busy map[string]bool
+
+	baseInstaller  BaseInstaller
+	installingBase bool
 }
 
 // New returns a manager. clientOpts are passed to every fetch client, which

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/diablo2org/launcher/internal/paths"
@@ -81,6 +82,36 @@ func DefaultDir() (string, error) {
 	}
 
 	return filepath.Join(base, "diablo2org", "launcher"), nil
+}
+
+// AppDataDir is where the launcher keeps what isn't settings or a cache: the
+// base game it installs and its download cache. %LOCALAPPDATA%\diablo2org on
+// Windows, ~/Library/Application Support/diablo2org on macOS, and
+// $XDG_DATA_HOME/diablo2org elsewhere.
+func AppDataDir() (string, error) {
+	switch runtime.GOOS {
+	case "windows":
+		dir, err := os.UserCacheDir() // %LOCALAPPDATA%
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(dir, "diablo2org"), nil
+	case "darwin":
+		dir, err := os.UserConfigDir() // ~/Library/Application Support
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(dir, "diablo2org"), nil
+	}
+
+	if dir := os.Getenv("XDG_DATA_HOME"); filepath.IsAbs(dir) {
+		return filepath.Join(dir, "diablo2org"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "share", "diablo2org"), nil
 }
 
 // Dir is the data folder.
