@@ -4,6 +4,7 @@
 package cdkey
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -27,12 +28,27 @@ func Normalise(key string) string {
 // only replaces runs of 16 or 26 characters, the two lengths keys come in.
 var keyLike = regexp.MustCompile(`(?i)\b[` + alphabet + `](?:-?[` + alphabet + `]){15,25}\b`)
 
+// spaced is a key in the groups it's printed in, 4-4-4-4 or 6-4-6-4-6,
+// separated by spaces. Spaces only between whole groups: a space anywhere
+// would let a match run on into the word before the key, so that the run
+// is the wrong length and the key itself is missed.
+var spaced = regexp.MustCompile(`(?i)\b(?:` + groups(4, 4, 4, 4) + `|` + groups(6, 4, 6, 4, 6) + `)\b`)
+
+func groups(sizes ...int) string {
+	parts := make([]string, len(sizes))
+	for i, n := range sizes {
+		parts[i] = fmt.Sprintf("[%s]{%d}", alphabet, n)
+	}
+	return strings.Join(parts, " ")
+}
+
 // Redaction replaces a key wherever it is found.
 const Redaction = "[CD key]"
 
 // Redact replaces the given keys, however they're spaced or cased, and
 // anything else shaped like a key: 16 or 26 key characters with both
-// letters and digits, optionally in hyphenated groups.
+// letters and digits, optionally in hyphenated groups or in the groups keys
+// are printed in, separated by spaces.
 func Redact(data []byte, keys ...string) []byte {
 	for _, k := range keys {
 		k = Normalise(k)
@@ -51,12 +67,14 @@ func Redact(data []byte, keys ...string) []byte {
 		data = regexp.MustCompile(b.String()).ReplaceAllLiteral(data, []byte(Redaction))
 	}
 
-	return keyLike.ReplaceAllFunc(data, func(m []byte) []byte {
+	replace := func(m []byte) []byte {
 		if !looksLikeKey(m) {
 			return m
 		}
 		return []byte(Redaction)
-	})
+	}
+	data = spaced.ReplaceAllFunc(data, replace)
+	return keyLike.ReplaceAllFunc(data, replace)
 }
 
 func looksLikeKey(m []byte) bool {
@@ -64,7 +82,7 @@ func looksLikeKey(m []byte) bool {
 	var letter, digit bool
 	for _, c := range m {
 		switch {
-		case c == '-':
+		case c == '-' || c == ' ':
 			continue
 		case c >= '0' && c <= '9':
 			digit = true

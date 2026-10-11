@@ -39,6 +39,10 @@ func TestRedactKeyShaped(t *testing.T) {
 		"key BCDE-2467-FGHJ-89KM here":         true,  // 16, grouped
 		"key bcde2467fghj89kmnprt246789 here":  true,  // 26, any case
 		"key BCDEFG-2467-FGHJKM-89KM-NPRTVW":   true,  // 26, grouped
+		"key BCDE 2467 FGHJ 89KM here":         true,  // 16, spaced
+		"the BCDE 2467 FGHJ 89KM":              true,  // after a word of key letters
+		"key BCDEFG 2467 FGHJKM 89KM NPRTVW":   true,  // 26, spaced
+		"piece 2467 of 8924 done at 4789 MB":   false, // numbers in prose
 		"word DEFENDERBECKETTBERG":             false, // no digits
 		"hash 2467246724672467":                false, // no letters
 		"short BCDE2467FGHJ89K":                false, // 15

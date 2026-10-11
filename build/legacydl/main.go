@@ -3,7 +3,8 @@
 // licence for the app's notices. A file already there with the pinned hash
 // isn't fetched again.
 //
-//	go run ./build/legacydl -pin build/legacy-dl.json -os windows -arch amd64 -out bin/blizzard-legacy-dl.exe -license bin/blizzard-legacy-dl-LICENSE.txt
+//	go run ./build/legacydl -pin build/legacy-dl.json -os windows -arch amd64 -out bin/blizzard-legacy-dl.exe
+//	go run ./build/legacydl -pin build/legacy-dl.json -license bin/blizzard-legacy-dl-LICENSE.txt
 package main
 
 import (
@@ -60,8 +61,11 @@ func main() {
 }
 
 func run(pinPath, goos, goarch, out, license string) error {
-	if goos == "" || goarch == "" || out == "" {
-		return fmt.Errorf("-os, -arch and -out are required")
+	if out == "" && license == "" {
+		return fmt.Errorf("give -out with -os and -arch, or -license, or both")
+	}
+	if out != "" && (goos == "" || goarch == "") {
+		return fmt.Errorf("-out needs -os and -arch")
 	}
 
 	data, err := os.ReadFile(pinPath)
@@ -73,20 +77,23 @@ func run(pinPath, goos, goarch, out, license string) error {
 		return fmt.Errorf("%s: %w", pinPath, err)
 	}
 
-	f, err := pin.File(goos, goarch)
-	if err != nil {
-		return err
-	}
-	if err := fetch(f, out, 0o755); err != nil {
-		return err
+	if out != "" {
+		f, err := pin.File(goos, goarch)
+		if err != nil {
+			return err
+		}
+		if err := fetch(f, out, 0o755); err != nil {
+			return err
+		}
+		fmt.Printf("blizzard-legacy-dl %s %s/%s -> %s\n", pin.Version, goos, goarch, out)
 	}
 	if license != "" {
 		if err := fetch(pin.License, license, 0o644); err != nil {
 			return err
 		}
+		fmt.Printf("blizzard-legacy-dl %s licence -> %s\n", pin.Version, license)
 	}
 
-	fmt.Printf("blizzard-legacy-dl %s %s/%s -> %s\n", pin.Version, goos, goarch, out)
 	return nil
 }
 

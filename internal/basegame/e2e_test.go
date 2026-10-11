@@ -25,6 +25,9 @@ func TestRealInstall(t *testing.T) {
 	if exe == "" {
 		t.Skip("LAUNCHER_E2E_LEGACY_DL isn't set")
 	}
+	if os.Getenv("LAUNCHER_E2E_BASE") == "" {
+		t.Fatal("LAUNCHER_E2E_BASE isn't set: give an empty or new folder to install into")
+	}
 	exe, _ = filepath.Abs(exe)
 	base, _ := filepath.Abs(os.Getenv("LAUNCHER_E2E_BASE"))
 
