@@ -177,3 +177,35 @@ func TestDownload(t *testing.T) {
 		t.Error("installer name with a path accepted")
 	}
 }
+
+func TestPackageURL(t *testing.T) {
+	old := downloadPrefix
+	defer func() { downloadPrefix = old }()
+	downloadPrefix = "https://github.com/diablo2org/launcher/releases/download/"
+	base := downloadPrefix + "v1.2.0/"
+	assets := []asset{
+		{Name: "launcher-amd64-installer.exe", DownloadURL: base + "launcher-amd64-installer.exe"},
+		{Name: "launcher-v1.2.0-universal.dmg", DownloadURL: base + "launcher-v1.2.0-universal.dmg"},
+		{Name: "launcher-v1.2.0-x86_64.AppImage", DownloadURL: base + "launcher-v1.2.0-x86_64.AppImage"},
+		{Name: "launcher-v1.2.0-arm64.dmg", DownloadURL: "https://example.com/launcher-v1.2.0-arm64.dmg"},
+	}
+
+	tests := []struct{ goos, goarch, want string }{
+		{"darwin", "arm64", base + "launcher-v1.2.0-universal.dmg"},
+		{"darwin", "amd64", base + "launcher-v1.2.0-universal.dmg"},
+		{"linux", "amd64", base + "launcher-v1.2.0-x86_64.AppImage"},
+		{"linux", "arm64", ""},
+		{"windows", "amd64", ""},
+	}
+	for _, tt := range tests {
+		if got := packageURL("v1.2.0", assets, tt.goos, tt.goarch); got != tt.want {
+			t.Errorf("%s/%s: %q, want %q", tt.goos, tt.goarch, got, tt.want)
+		}
+	}
+
+	// A package published anywhere else isn't offered.
+	elsewhere := []asset{{Name: "launcher-v1.2.0-universal.dmg", DownloadURL: "https://example.com/launcher-v1.2.0-universal.dmg"}}
+	if got := packageURL("v1.2.0", elsewhere, "darwin", "arm64"); got != "" {
+		t.Errorf("offered a package from elsewhere: %q", got)
+	}
+}
