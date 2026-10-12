@@ -23,7 +23,10 @@
 
   // Up to four to a column, bottom-aligned; more start a second column. Report
   // always comes last.
-  const rows = $derived(Math.min(4, shown.length + (ladder ? 2 : 1)));
+  // Nine or ten take five rows, so they still fit two columns beside PLAY at
+  // the narrowest window.
+  const total = $derived(shown.length + (ladder ? 2 : 1));
+  const rows = $derived(total > 8 ? 5 : Math.min(4, total));
 
   // The hover text says where a link goes, since the server chose it.
   function host(url: string): string {
@@ -42,5 +45,5 @@
   {#if ladder}
     <LinkTile kind="ladder" label="Ladder" glyph="rank" title="This server's ladder" onclick={() => (app.page = "ladder")} />
   {/if}
-  <LinkTile kind="report" label="Report" title="Report a problem to the server's team" onclick={() => (app.report = "server")} />
+  <LinkTile kind="report" label="Report" title="Report a problem with this server" onclick={() => (app.report = "server")} />
 </nav>

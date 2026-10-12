@@ -10,6 +10,7 @@ import (
 	"github.com/diablo2org/launcher/internal/core"
 	"github.com/diablo2org/launcher/internal/launch"
 	"github.com/diablo2org/launcher/internal/logs"
+	"github.com/diablo2org/launcher/internal/report"
 	"github.com/diablo2org/launcher/internal/store"
 )
 
@@ -86,6 +87,24 @@ func TestReportScope(t *testing.T) {
 	}
 	if in := s.input("resurgence"); len(in.Servers) != 1 || in.Servers[0] != "resurgence" {
 		t.Errorf("server report: servers %v", in.Servers)
+	}
+
+	// A state.json that can't be read can't be cut down to one server, so a
+	// server's report leaves it out; the launcher's still takes it.
+	os.WriteFile(filepath.Join(st.Dir(), "state.json"), []byte("{"), 0o644)
+	has := func(items []report.Item) bool {
+		for _, it := range items {
+			if it.Name == "state.json" {
+				return true
+			}
+		}
+		return false
+	}
+	if has(report.Collect(s.input("resurgence"))) {
+		t.Error("server report holds an unreadable state.json")
+	}
+	if !has(report.Collect(s.input(""))) {
+		t.Error("launcher report lost state.json")
 	}
 }
 

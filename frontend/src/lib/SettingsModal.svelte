@@ -80,7 +80,8 @@
   }
 </script>
 
-<svelte:window onkeydown={(e) => e.key === "Escape" && close()} />
+<!-- An Escape a dropdown already used to close its list leaves Settings open. -->
+<svelte:window onkeydown={(e) => e.key === "Escape" && !e.defaultPrevented && close()} />
 
 {#snippet row(title: string, description: string, disabled: boolean)}
   <div class="min-w-0 flex-1" class:opacity-45={disabled}>

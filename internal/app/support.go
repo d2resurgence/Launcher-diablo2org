@@ -106,6 +106,9 @@ func (s *SupportService) input(only string) report.Input {
 		in.Servers = []string{only}
 		if state, err := s.st.Load(); err == nil {
 			in.State = scopedState(state, only)
+		} else {
+			// The raw file holds every server's settings.
+			in.NoState = true
 		}
 	}
 

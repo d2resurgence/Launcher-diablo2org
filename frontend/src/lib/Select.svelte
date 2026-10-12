@@ -23,6 +23,11 @@
   let root: HTMLDivElement;
   let button: HTMLButtonElement;
 
+  // The highlighted option stays in view as the keys move it.
+  $effect(() => {
+    if (open) document.getElementById(`${id}-${active}`)?.scrollIntoView({ block: "nearest" });
+  });
+
   const current = $derived(options.find((o) => o.value === value));
 
   function show() {
