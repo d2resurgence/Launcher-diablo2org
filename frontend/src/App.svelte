@@ -53,6 +53,12 @@
     </div>
   {/each}
 
+  <!-- The launcher's own pages: the grey slate, darkened towards the edges. -->
+  <div class="pointer-events-none absolute inset-0 transition-opacity duration-500" class:opacity-0={showBackground} aria-hidden="true">
+    <div class="tex-slate absolute inset-0 opacity-55"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,transparent_0%,rgba(6,6,6,0.85)_75%)]"></div>
+  </div>
+
   {#if app.page !== "welcome"}
     <Rail />
   {/if}

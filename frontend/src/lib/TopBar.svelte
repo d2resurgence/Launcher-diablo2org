@@ -61,11 +61,10 @@
     {/if}
   {:else if app.page === "welcome"}
     <span class="title text-[14px]">Getting started</span>
-  {:else if app.page === "catalog"}
-    <span class="title text-[14px]">All servers</span>
-  {:else}
+  {:else if app.page === "checker"}
     <span class="title text-[14px]">Profile checker</span>
   {/if}
+  <!-- All servers titles itself. -->
 
   <div class="flex-1"></div>
 

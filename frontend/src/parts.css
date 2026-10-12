@@ -304,3 +304,16 @@
   background: radial-gradient(circle at 35% 30%, #3a1511, #120605);
   color: #f08a7a;
 }
+
+/* A panel on the launcher's own pages (All servers, set-up screens). */
+.card {
+  border: 1px solid rgba(201, 164, 96, 0.22);
+  background: rgba(14, 14, 14, 0.82);
+}
+
+/* A stone button that removes or forgets something: red on hover. */
+.btn-stone.danger:hover:not(:disabled) {
+  border-color: var(--color-blood);
+  color: #f08a7a;
+  box-shadow: 0 0 10px rgba(179, 38, 30, 0.3);
+}
