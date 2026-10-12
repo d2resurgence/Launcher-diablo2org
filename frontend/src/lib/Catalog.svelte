@@ -2,7 +2,7 @@
   import Icon from "./Icon.svelte";
   import { app } from "./state.svelte";
 
-  const full = $derived(app.favourites.length >= 3);
+  const full = $derived(app.favourites.length >= app.maxPinned);
 
   let adding = $state(false);
   let addURL = $state("");
@@ -33,7 +33,7 @@
 
 <div class="h-full overflow-y-auto px-10 pt-6 pb-10">
   <p class="max-w-2xl text-[13px] text-body">
-    Pin up to three servers to keep them in the bar on the left. Switch between them with a click or Ctrl+1, 2 and 3.
+    Pin up to {app.maxPinned} servers to keep them in the bar on the left. Switch between them with a click or Ctrl+1 to Ctrl+{Math.min(9, app.maxPinned)}.
   </p>
 
   {#if app.overview?.error}
@@ -88,7 +88,7 @@
             class="title flex items-center gap-1.5 rounded-[3px] border border-edge px-3 py-2 text-[12px] hover:border-muted disabled:opacity-40"
             aria-pressed={pinned}
             disabled={!s.profile || (!pinned && full)}
-            title={!pinned && full ? "Unpin a server first; three can be pinned" : undefined}
+            title={!pinned && full ? `Unpin a server first; ${app.maxPinned} can be pinned` : undefined}
             onclick={() => app.setFavourite(s.id, !pinned)}
           >
             <Icon name={pinned ? "check" : "pin"} size={13} />

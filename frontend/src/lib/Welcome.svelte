@@ -10,7 +10,7 @@
 
   const o = $derived(app.overview);
   const listed = $derived(app.servers.filter((s) => s.profile && s.verified));
-  const full = $derived(picked.length >= 3);
+  const full = $derived(picked.length >= app.maxPinned);
 
   function toggle(id: string) {
     if (picked.includes(id)) picked = picked.filter((p) => p !== id);
@@ -44,7 +44,7 @@
 
       <h2 class="title mt-8 text-[18px]">Pick your servers</h2>
       <p class="mt-3 max-w-2xl text-[13px] leading-relaxed text-body">
-        Choose up to three to keep in the bar on the left, and switch between them with Ctrl+1, 2 and 3. You can change them any time
+        Choose up to {app.maxPinned} to keep in the bar on the left, and switch between them with Ctrl+1 to Ctrl+{Math.min(9, app.maxPinned)}. You can change them any time
         from All servers.
       </p>
 

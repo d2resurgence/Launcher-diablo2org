@@ -69,14 +69,17 @@
 
   <div class="flex-1"></div>
 
-  <button
-    class="no-drag rounded p-2 text-muted transition-colors hover:text-title"
-    title="Settings"
-    aria-label="Settings"
-    onclick={() => (app.settingsOpen = true)}
-  >
-    <Icon name="gear" size={17} />
-  </button>
+  <!-- Settings lives on the rail; the welcome page has no rail, so it keeps one here. -->
+  {#if app.page === "welcome"}
+    <button
+      class="no-drag rounded p-2 text-muted transition-colors hover:text-title"
+      title="Settings"
+      aria-label="Settings"
+      onclick={() => (app.settingsOpen = true)}
+    >
+      <Icon name="gear" size={17} />
+    </button>
+  {/if}
 
   <div class="no-drag ml-2 flex self-start pt-1">
     <button class="rounded p-2 text-muted hover:text-title" aria-label="Minimise" onclick={() => Window.Minimise()}>

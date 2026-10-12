@@ -239,6 +239,12 @@ class AppState {
     return this.overview?.favourites ?? [];
   }
 
+  // How many servers can be pinned; the launcher sets it, so nothing here
+  // assumes a number.
+  get maxPinned(): number {
+    return this.overview?.maxFavourites || 3;
+  }
+
   get current(): ServerInfo | undefined {
     return this.servers.find((s) => s.id === this.selected);
   }
@@ -337,7 +343,7 @@ class AppState {
     this.checkLink();
   }
 
-  // Switch to the nth pinned server, for Ctrl+1..3.
+  // Switch to the nth pinned server, for Ctrl+1, 2, ...
   selectFavourite(n: number) {
     const id = this.favourites[n];
     if (id) this.select(id);

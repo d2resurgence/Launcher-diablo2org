@@ -19,9 +19,11 @@
   const showBackground = $derived(app.page === "launch" || app.page === "ladder");
 
   function onKeydown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && ["1", "2", "3"].includes(e.key)) {
+    // Ctrl+1 to Ctrl+9, as far as servers can be pinned.
+    const n = Number(e.key);
+    if ((e.ctrlKey || e.metaKey) && Number.isInteger(n) && n >= 1 && n <= Math.min(9, app.maxPinned)) {
       e.preventDefault();
-      app.selectFavourite(Number(e.key) - 1);
+      app.selectFavourite(n - 1);
     }
   }
 </script>
