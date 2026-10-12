@@ -67,7 +67,7 @@
   </div>
 
   <!-- News grows down to just above the status line, then scrolls. -->
-  <div class="pointer-events-none absolute top-4 right-4 bottom-[118px] flex flex-col items-end">
+  <div class={["pointer-events-none absolute right-4 bottom-[118px] flex flex-col items-end", app.tabBar ? "top-4" : "top-[46px]"]}>
     <div class="pointer-events-auto flex min-h-0 flex-col"><NewsList {data} /></div>
   </div>
 
@@ -87,7 +87,7 @@
     <!-- Links on the left, PLAY in the middle, the status on the right, all on one baseline. -->
     <div class="grid grid-cols-[1fr_auto_1fr] items-end gap-6">
       <div class="min-w-0">
-        <ServerLinks links={profile?.links} />
+        <ServerLinks links={profile?.links} ladder={!!profile?.ladder && !app.tabBar} />
       </div>
 
       <div class="flex w-[286px] flex-col gap-2.5">

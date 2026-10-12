@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ServerData } from "./state.svelte";
+  import { app, type ServerData } from "./state.svelte";
 
   let { data }: { data: ServerData } = $props();
 
@@ -15,7 +15,11 @@
   const entries = $derived(boards[board]?.entries ?? []);
 </script>
 
-<div class="flex h-full flex-col px-10 pt-6 pb-6">
+<div class={["flex h-full flex-col px-10 pb-6", app.tabBar ? "pt-6" : "pt-12"]}>
+  {#if !app.tabBar}
+    <!-- No tab bar to go back with. -->
+    <button class="title mb-4 self-start text-[12px] tracking-[0.08em] !text-muted hover:!text-title" onclick={() => (app.page = "launch")}>‹ BACK</button>
+  {/if}
   {#if boards.length > 1}
     <div class="mb-4 flex gap-6" role="tablist">
       {#each boards as b, i (b.id)}

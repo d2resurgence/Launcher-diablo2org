@@ -19,8 +19,9 @@
     kind,
     label,
     title,
+    glyph = "out",
     onclick,
-  }: { kind: string; label: string; title?: string; onclick: () => void } = $props();
+  }: { kind: string; label: string; title?: string; glyph?: "out" | "rank"; onclick: () => void } = $props();
 
   const art = $derived(kinds[kind]);
 </script>
@@ -35,7 +36,7 @@
       <span class="link-icon" style:--mask={`url(${art.icon})`} style:--scale={art.scale}></span>
     {:else}
       <!-- No art for this kind of link yet: a plain glyph in the icon colour. -->
-      <span class="absolute inset-0 flex items-center justify-center text-link-icon"><Icon name="out" size={18} /></span>
+      <span class="absolute inset-0 flex items-center justify-center text-link-icon"><Icon name={glyph} size={18} /></span>
     {/if}
   </span>
   <span class="text-[14px] tracking-[0.06em] !text-parchment [text-shadow:0_1px_6px_#000] group-hover:!text-[#fff0c4]">{label}</span>

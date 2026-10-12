@@ -272,6 +272,13 @@ class AppState {
 
   // How many servers can be pinned; the launcher sets it, so nothing here
   // assumes a number.
+  // The Launch / Ladder / Community bar: on a server's pages, unless its
+  // profile leaves it out. Everywhere else the top is a slim strip holding
+  // the window controls, and pages keep clicks out of its 40px.
+  get tabBar() {
+    return (this.page === "launch" || this.page === "ladder") && !this.current?.profile?.branding?.hideTabBar;
+  }
+
   get maxPinned(): number {
     return this.overview?.maxFavourites || 3;
   }
