@@ -4,6 +4,7 @@
   import LadderView from "./lib/LadderView.svelte";
   import LaunchView from "./lib/LaunchView.svelte";
   import ProfileChecker from "./lib/ProfileChecker.svelte";
+  import ReportDialog from "./lib/ReportDialog.svelte";
   import Rail from "./lib/Rail.svelte";
   import SettingsModal from "./lib/SettingsModal.svelte";
   import TopBar from "./lib/TopBar.svelte";
@@ -93,6 +94,10 @@
 
   {#if app.settingsOpen}
     <SettingsModal />
+  {/if}
+
+  {#if app.reportOpen && app.current?.profile}
+    <ReportDialog />
   {/if}
 
   {#if app.link}

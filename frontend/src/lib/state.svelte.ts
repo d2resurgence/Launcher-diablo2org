@@ -173,6 +173,7 @@ class AppState {
   selected = $state("");
   page = $state<Page>("launch");
   settingsOpen = $state(false);
+  reportOpen = $state(false);
   version = $state("");
   update = $state<Release | null>(null);
   // The new launcher's download, while it's under way.
