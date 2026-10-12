@@ -317,3 +317,29 @@
   color: #f08a7a;
   box-shadow: 0 0 10px rgba(179, 38, 30, 0.3);
 }
+
+/* A card that is picked by clicking it (servers to pin, how to get the
+   game): gold edge on hover, gold edge and a faint gold fill when picked. */
+.card.pick {
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.card.pick:hover:not(:disabled) {
+  border-color: var(--color-gold-line);
+}
+.card.pick[aria-pressed="true"] {
+  border-color: var(--color-gold-mid);
+  background-color: rgba(38, 31, 20, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(201, 164, 96, 0.18), 0 0 12px rgba(201, 164, 96, 0.18);
+}
+.card.pick:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Small round marker: a picked box, or a step done. */
+.mark-on {
+  border-color: var(--color-gold-mid);
+  background: radial-gradient(circle at 35% 35%, #f6dfa0, #a07a3c);
+  color: #1a1206;
+}

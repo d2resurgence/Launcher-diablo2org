@@ -59,12 +59,8 @@
     {#if community}
       {@render item("Community", false, () => Browser.OpenURL(community), true)}
     {/if}
-  {:else if app.page === "welcome"}
-    <span class="title text-[14px]">Getting started</span>
-  {:else if app.page === "checker"}
-    <span class="title text-[14px]">Profile checker</span>
   {/if}
-  <!-- All servers titles itself. -->
+  <!-- The launcher's own pages title themselves. -->
 
   <div class="flex-1"></div>
 

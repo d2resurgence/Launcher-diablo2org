@@ -72,7 +72,7 @@
 
     <main class="min-h-0 flex-1">
       {#if app.error}
-        <p class="mx-8 mt-4 rounded border border-bad/50 bg-panel/90 p-3 text-[12px] text-bad" role="alert">{app.error}</p>
+        <p class="card mx-8 mt-4 !border-[#7a2a20] p-3 text-[13px] text-bad" role="alert">{app.error}</p>
       {/if}
 
       {#if app.page === "welcome"}
@@ -92,7 +92,7 @@
           {/if}
         {/key}
       {:else if app.current?.error}
-        <p class="mx-8 mt-6 rounded border border-bad/50 bg-panel/90 p-4 text-[13px] text-bad">{app.current.error}</p>
+        <p class="card mx-8 mt-6 !border-[#7a2a20] p-4 text-[13px] text-bad">{app.current.error}</p>
       {:else if !app.overview}
         <p class="px-8 pt-6 text-body">Loading…</p>
       {/if}
