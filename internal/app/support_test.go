@@ -40,7 +40,7 @@ func TestSaveReport(t *testing.T) {
 		ShowFile: func(path string) error { shown = path; return nil },
 	})
 
-	path, err := s.SaveReport()
+	path, err := s.SaveReport("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,8 +64,28 @@ func TestSaveReport(t *testing.T) {
 
 	// Cancelling saves nothing.
 	s.host.SaveFile = func(string, string) (string, error) { return "", nil }
-	if path, err := s.SaveReport(); path != "" || err != nil {
+	if path, err := s.SaveReport(""); path != "" || err != nil {
 		t.Errorf("cancelled: %q, %v", path, err)
+	}
+}
+
+// A launcher report holds no server's files; a server's holds only its own.
+func TestReportScope(t *testing.T) {
+	st, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := core.New(st, core.DirListing(t.TempDir()), launch.New(nil, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewSupportService(st, m, Host{})
+
+	if in := s.input(""); len(in.Servers) != 0 || in.State != nil {
+		t.Errorf("launcher report: servers %v, state cut %v", in.Servers, in.State != nil)
+	}
+	if in := s.input("resurgence"); len(in.Servers) != 1 || in.Servers[0] != "resurgence" {
+		t.Errorf("server report: servers %v", in.Servers)
 	}
 }
 

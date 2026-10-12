@@ -12,6 +12,8 @@
   const profile = $derived(info?.profile);
   const launcher = app.report === "launcher";
   const sends = $derived(!launcher && !!profile?.report?.url);
+  // What a saved zip holds: the launcher's own files, or this server's.
+  const scope = $derived(launcher ? "" : (info?.id ?? ""));
 
   let items = $state<Item[] | null>(null);
   let host = $state("");
@@ -28,7 +30,7 @@
     try {
       const sr = sends && info ? await SupportService.ServerReport(info.id) : null;
       host = sr?.host ?? "";
-      items = sr ? (sr.items ?? []) : ((await SupportService.ReportContents()) ?? []);
+      items = sr ? (sr.items ?? []) : ((await SupportService.ReportContents(scope)) ?? []);
     } catch (err) {
       error = errorText(err);
     }
@@ -73,7 +75,7 @@
   async function save() {
     error = "";
     try {
-      const path = await SupportService.SaveReport();
+      const path = await SupportService.SaveReport(scope);
       if (!path) return;
       app.toast({ kind: "ok", title: "Report saved", detail: path, action: { label: "Show file", run: () => showSaved(path) } });
       app.report = "";
