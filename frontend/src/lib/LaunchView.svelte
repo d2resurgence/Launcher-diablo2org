@@ -2,7 +2,6 @@
   import { ServerService } from "../../bindings/github.com/diablo2org/launcher/internal/app";
   import type { ServerInfo } from "../../bindings/github.com/diablo2org/launcher/internal/core";
   import { bytes, errorText } from "./format";
-  import LauncherUpdate from "./LauncherUpdate.svelte";
   import NewsList from "./NewsList.svelte";
   import Select from "./Select.svelte";
   import ServerLinks from "./ServerLinks.svelte";
@@ -66,10 +65,6 @@
       <h1 class="title mt-16 text-4xl drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{profile?.name ?? info.id}</h1>
     {/if}
   </div>
-
-  {#if app.update}
-    <div class="absolute top-4 left-7 z-10"><LauncherUpdate /></div>
-  {/if}
 
   <!-- News grows down to just above the status line, then scrolls. -->
   <div class="pointer-events-none absolute top-4 right-4 bottom-[118px] flex flex-col items-end">

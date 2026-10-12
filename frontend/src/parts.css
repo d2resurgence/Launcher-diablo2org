@@ -279,3 +279,28 @@
   backdrop-filter: blur(8px);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
 }
+
+/* Toast: dark glass with a gold edge and an inner hairline, so it reads as a
+   control over any server's art. .bad turns the edge and badge red. */
+.toast {
+  border: 1px solid var(--color-gold-line);
+  background: rgba(15, 14, 13, 0.86);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.55), inset 0 0 0 3px rgba(201, 164, 96, 0.14), 0 14px 40px rgba(0, 0, 0, 0.75);
+}
+.toast.bad {
+  border-color: #7a2a20;
+}
+.toast-badge {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-gold-line);
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #2c241a, #0d0b09);
+  color: var(--color-gold);
+}
+.toast.bad .toast-badge {
+  border-color: #8f3328;
+  background: radial-gradient(circle at 35% 30%, #3a1511, #120605);
+  color: #f08a7a;
+}

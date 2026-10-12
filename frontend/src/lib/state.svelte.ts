@@ -19,6 +19,17 @@ import { errorText } from "./format";
 
 export type Page = "welcome" | "launch" | "ladder" | "catalog" | "checker" | "wine";
 
+export type Toast = {
+  id: number;
+  kind: "ok" | "bad" | "info";
+  title: string;
+  line?: string;
+  detail?: string;
+  action?: { label: string; run: () => void };
+  // Fades after ~6 s unless the pointer is on it.
+  fades?: boolean;
+};
+
 // The last server shown is a convenience for this machine only, so it lives
 // in the webview's storage, which can be unavailable.
 const lastServerKey = "launcher.lastServer";
@@ -179,11 +190,28 @@ class AppState {
   // The new launcher's download, while it's under way.
   launcherUpdate = $state<{ done: number; total: number } | null>(null);
   updateError = $state("");
+  // The launcher-update toast, closed for this run; it's back next start.
+  updateHidden = $state(false);
   error = $state("");
   // A diablo2org:// link waiting for the player to agree to it.
   link = $state<LinkRequest | null>(null);
+  toasts = $state<Toast[]>([]);
 
   private data = new Map<string, ServerData>();
+  private toastId = 0;
+
+  // A notice over the page. One that only confirms something fades by itself;
+  // one with something to keep (a reference, a path) or click stays until
+  // closed.
+  toast(t: Omit<Toast, "id">) {
+    const id = ++this.toastId;
+    this.toasts.push({ ...t, id });
+    return id;
+  }
+
+  dismiss(id: number) {
+    this.toasts = this.toasts.filter((t) => t.id !== id);
+  }
 
   constructor() {
     Events.On("update:progress", (ev: { data: UpdateProgress }) => {

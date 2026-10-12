@@ -7,6 +7,7 @@
   import ReportDialog from "./lib/ReportDialog.svelte";
   import Rail from "./lib/Rail.svelte";
   import SettingsModal from "./lib/SettingsModal.svelte";
+  import Toasts from "./lib/Toasts.svelte";
   import TopBar from "./lib/TopBar.svelte";
   import Welcome from "./lib/Welcome.svelte";
   import WineSetupPage from "./lib/WineSetupPage.svelte";
@@ -90,6 +91,8 @@
         <p class="px-8 pt-6 text-body">Loading…</p>
       {/if}
     </main>
+
+    <Toasts />
   </div>
 
   {#if app.settingsOpen}
