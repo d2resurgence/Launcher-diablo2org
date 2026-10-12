@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import LogsLink from "./LogsLink.svelte";
   import RosettaPrompt from "./RosettaPrompt.svelte";
   import StepList from "./StepList.svelte";
   import { app } from "./state.svelte";
@@ -30,6 +31,7 @@
     {/if}
     {#if wine.error}
       <p class="mt-4 max-w-xl whitespace-pre-line text-[12px] text-bad">{wine.error}</p>
+      <LogsLink />
     {/if}
 
     <div class="mt-8 flex items-center gap-4">

@@ -5,6 +5,7 @@
   import type { BaseSetup, ServerInfo } from "../../bindings/github.com/diablo2org/launcher/internal/core";
   import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
+  import LogsLink from "./LogsLink.svelte";
   import RosettaPrompt from "./RosettaPrompt.svelte";
   import Select from "./Select.svelte";
   import StepList from "./StepList.svelte";
@@ -312,6 +313,7 @@
 
   {#if failure}
     <p class="mt-4 text-[12px] text-bad">{failure}</p>
+    <LogsLink />
   {/if}
 
   <div class="mt-8 flex items-center gap-4">
@@ -388,6 +390,7 @@
 
   {#if failure}
     <p class="mt-4 max-w-xl whitespace-pre-line text-[12px] text-bad">{failure}</p>
+    <LogsLink />
   {/if}
   {#if result?.warnings?.length}
     <ul class="mt-4 max-w-xl text-[12px] text-date">

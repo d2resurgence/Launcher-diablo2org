@@ -64,18 +64,8 @@
 
   <div class="flex-1"></div>
 
-  <!-- Settings lives on the rail; the welcome page has no rail, so it keeps one here. -->
-  {#if app.page === "welcome"}
-    <button
-      class="no-drag rounded p-2 text-muted transition-colors hover:text-title"
-      title="Settings"
-      aria-label="Settings"
-      onclick={() => (app.settingsOpen = true)}
-    >
-      <Icon name="gear" size={17} />
-    </button>
-  {/if}
-
+  <!-- No Settings on the welcome pages: nothing there is needed before set-up
+       ends, and the profile checker would leave the flow. Settings is on the rail. -->
   <div class="no-drag ml-2 flex self-start pt-1">
     <button class="rounded p-2 text-muted hover:text-title" aria-label="Minimise" onclick={() => Window.Minimise()}>
       <Icon name="min" size={16} />
