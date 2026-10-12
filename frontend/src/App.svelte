@@ -105,7 +105,7 @@
     <SettingsModal />
   {/if}
 
-  {#if app.reportOpen && app.current?.profile}
+  {#if app.report === "launcher" || (app.report === "server" && app.current?.profile)}
     <ReportDialog />
   {/if}
 

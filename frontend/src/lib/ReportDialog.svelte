@@ -10,7 +10,8 @@
   // otherwise it's saved as a zip for the player to pass on.
   const info = $derived(app.current);
   const profile = $derived(info?.profile);
-  const sends = $derived(!!profile?.report?.url);
+  const launcher = app.report === "launcher";
+  const sends = $derived(!launcher && !!profile?.report?.url);
 
   let items = $state<Item[] | null>(null);
   let host = $state("");
@@ -49,7 +50,7 @@
           detail: r.id ? r.message : "",
           fades: !r.id,
         });
-        app.reportOpen = false;
+        app.report = "";
       } else if (r.savedTo) {
         app.toast({
           kind: "bad",
@@ -58,7 +59,7 @@
           detail: `Saved to ${r.savedTo}, for you to send yourself`,
           action: { label: "Show file", run: () => showSaved(r.savedTo) },
         });
-        app.reportOpen = false;
+        app.report = "";
       } else {
         error = `Couldn't send the report: ${r.error}`;
       }
@@ -75,7 +76,7 @@
       const path = await SupportService.SaveReport();
       if (!path) return;
       app.toast({ kind: "ok", title: "Report saved", detail: path, action: { label: "Show file", run: () => showSaved(path) } });
-      app.reportOpen = false;
+      app.report = "";
     } catch (err) {
       error = errorText(err);
     }
@@ -91,7 +92,7 @@
 
   // Closing mid-send would lose the result, so the dialog stays until it's in.
   function close() {
-    if (!sending) app.reportOpen = false;
+    if (!sending) app.report = "";
   }
 </script>
 
@@ -106,10 +107,12 @@
     <div class="mt-[18px] flex items-center gap-3.5">
       <span class="link-tile !h-10 !w-10" aria-hidden="true"><span class="link-icon" style:--mask={`url(${reportIcon})`}></span></span>
       <div class="min-w-0">
-        <h2 id="report-title" class="title text-[19px] !text-title">Report a problem</h2>
+        <h2 id="report-title" class="title text-[19px] !text-title">{launcher ? "Report a launcher problem" : "Report a problem"}</h2>
         <p class="mt-0.5 truncate text-[13px] text-body">
           {#if sends}
             Sent to the {profile?.name} team{host ? " at " : ""}<span class="text-[#d9c49a]">{host}</span>
+          {:else if launcher}
+            Saved as a zip, for you to send to the launcher's developers
           {:else}
             Saved as a zip, for you to send to {profile?.name ?? "the server"}'s team
           {/if}

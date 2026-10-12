@@ -38,5 +38,5 @@
   {#each shown as l (l.key)}
     <LinkTile kind={l.key} label={l.label} title={`Opens ${host(l.url)}`} onclick={() => Browser.OpenURL(l.url)} />
   {/each}
-  <LinkTile kind="report" label="Report" title="Report a problem to the server's team" onclick={() => (app.reportOpen = true)} />
+  <LinkTile kind="report" label="Report" title="Report a problem to the server's team" onclick={() => (app.report = "server")} />
 </nav>

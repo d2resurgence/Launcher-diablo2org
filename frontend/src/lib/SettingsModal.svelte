@@ -204,8 +204,19 @@
             </div>
 
             <div class="settings-row">
-              {@render row("Logs", "The launcher's own log files. To send a bug report, use Report on a server's page.", false)}
+              {@render row("Logs", "The launcher's own log files.", false)}
               <button class="btn-stone h-[34px] w-[132px] text-[12px]" onclick={() => run(() => SupportService.OpenLogs())}>OPEN</button>
+            </div>
+
+            <div class="settings-row">
+              {@render row("Launcher problem", "Saves the launcher's logs as a zip for its developers. A problem with a server's game goes to its team: use Report on its page.", false)}
+              <button
+                class="btn-stone h-[34px] w-[132px] text-[12px]"
+                onclick={() => {
+                  close();
+                  app.report = "launcher";
+                }}>REPORT</button
+              >
             </div>
 
             <div class="settings-row">

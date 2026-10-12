@@ -184,7 +184,9 @@ class AppState {
   selected = $state("");
   page = $state<Page>("launch");
   settingsOpen = $state(false);
-  reportOpen = $state(false);
+  // The report dialog: a server's (sent to its team when it has a report
+  // URL) or the launcher's own (always saved as a zip).
+  report = $state<"" | "server" | "launcher">("");
   version = $state("");
   update = $state<Release | null>(null);
   // The new launcher's download, while it's under way.
