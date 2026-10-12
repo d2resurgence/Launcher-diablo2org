@@ -71,9 +71,10 @@
     <div class="absolute top-4 left-7 z-10"><LauncherUpdate /></div>
   {/if}
 
-  <aside class="glass absolute top-4 right-4 flex max-h-[calc(100%-150px)] w-[318px] flex-col" aria-label="News">
-    <NewsList {data} />
-  </aside>
+  <!-- News grows down to just above the status line, then scrolls. -->
+  <div class="pointer-events-none absolute top-4 right-4 bottom-[118px] flex flex-col items-end">
+    <div class="pointer-events-auto flex min-h-0 flex-col"><NewsList {data} /></div>
+  </div>
 
   <div class="absolute inset-x-0 bottom-0 flex flex-col gap-4 px-7 pb-6">
     {#if data.copyBytes > 0}
