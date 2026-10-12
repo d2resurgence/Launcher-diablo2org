@@ -4,6 +4,7 @@
 @import "@fontsource/alegreya-sans/400.css";
 @import "@fontsource/alegreya-sans/500.css";
 @import "@fontsource/alegreya-sans/700.css";
+@import "./parts.css";
 
 /* Stone and gold: dark neutral stone surfaces, gold edges and titles,
    parchment text. Surfaces stay neutral grey so any server's art sits well
